@@ -1,0 +1,35 @@
+apply plugin: 'java'
+apply plugin: 'eclipse'
+
+jar {
+    archiveName = "guido-agent-${version}.jar"
+    manifest {
+        attributes(
+                'Premain-Class': 'org.guido.agent.AgentMain',
+                'Can-Redefine-Classes': 'true',
+                'Can-Retransform-Classes': 'true',
+                'Can-Set-Native-Method-Prefix': 'true',
+                'Implementation-Title': "ClassLogger",
+                'Implementation-Version': version
+        )
+    }
+}
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+	compile group: 'org.javassist', name: 'javassist', version: '3.20.0-GA'
+}
+
+test {
+    systemProperties 'property': 'value'
+}
+
+uploadArchives {
+    repositories {
+       flatDir {
+           dirs 'repos'
+       }
+    }
+}

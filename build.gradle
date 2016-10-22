@@ -1,0 +1,43 @@
+allprojects {
+    apply plugin: 'idea'
+    apply plugin: 'eclipse'
+    idea {
+        module {
+            downloadSources = true
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'groovy'
+    apply plugin: 'maven'
+	
+    group = 'org.guido'
+
+    version = '0.1.SNAPSHOT'
+	
+    project.sourceCompatibility = 1.7
+    project.targetCompatibility = 1.7
+
+    repositories {
+        mavenLocal()
+        maven { url "http://repo.spring.io/release" }
+        maven { url "http://repo.spring.io/milestone" }
+        mavenCentral()
+    }
+
+    buildscript {
+        repositories {
+            jcenter()
+            mavenLocal()
+            mavenCentral()
+        }
+
+        dependencies {
+			classpath 'org.cloudfoundry:cf-gradle-plugin:1.1.2'
+			classpath 'org.springframework.boot:spring-boot-gradle-plugin:1.3.4.RELEASE'
+			classpath "io.spring.gradle:dependency-management-plugin:0.6.1.RELEASE"
+        }
+    }
+}
