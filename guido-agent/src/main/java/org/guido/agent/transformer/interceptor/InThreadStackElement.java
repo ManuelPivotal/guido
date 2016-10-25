@@ -4,17 +4,15 @@ import java.util.Map;
 
 
 public class InThreadStackElement {
-	public Map<String, String> reference;
+	public Map<String, Object> reference;
 	public long startNanoTime;
 	public long stopNanoTime;
 	public long deltaTime;
-	public String sudoThreadId;
 	
-	public InThreadStackElement(String sudoThreadId) {
-		this.sudoThreadId = sudoThreadId;
+	public InThreadStackElement() {
 	}
 
-	public void start(Map<String, String> reference) {
+	public void start(Map<String, Object> reference) {
 		this.reference = reference;
 		this.startNanoTime = System.nanoTime();
 		this.stopNanoTime = -1;

@@ -100,7 +100,7 @@ public class JvstCodeGen extends MemberCodeGen {
         }
         else if (name.equals(sigName)) {
             bytecode.addLdc(Descriptor.ofMethod(returnType, paramTypeList));
-            bytecode.addInvokestatic("javassist/runtime/Desc", "getParams",
+            bytecode.addInvokestatic("oss/guido/javassist/runtime/Desc", "getParams",
                                 "(Ljava/lang/String;)[Ljava/lang/Class;");
             exprType = CLASS;
             arrayDim = 1;
@@ -125,7 +125,7 @@ public class JvstCodeGen extends MemberCodeGen {
     }
 
     private void callGetType(String method) {
-        bytecode.addInvokestatic("javassist/runtime/Desc", method,
+        bytecode.addInvokestatic("oss/guido/javassist/runtime/Desc", method,
                                 "(Ljava/lang/String;)Ljava/lang/Class;");
         exprType = CLASS;
         arrayDim = 0;
