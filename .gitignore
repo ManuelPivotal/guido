@@ -36,6 +36,7 @@ hs_err_pid*
 .classpath
 .springBeans
 bin/
+libs/
 classes/
 
 ### Gradle template

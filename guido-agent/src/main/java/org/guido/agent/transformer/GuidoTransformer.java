@@ -11,26 +11,120 @@ import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
-import javassist.ByteArrayClassPath;
-import javassist.ClassPool;
-import javassist.CtClass;
-import javassist.CtMethod;
-import javassist.LoaderClassPath;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.LinkedBlockingDeque;
 
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
 
+import oss.guido.ch.qos.logback.classic.Level;
+import oss.guido.ch.qos.logback.classic.Logger;
+import oss.guido.ch.qos.logback.classic.LoggerContext;
+import oss.guido.ch.qos.logback.core.ConsoleAppender;
+import oss.guido.ch.qos.logback.core.util.Duration;
+import oss.guido.javassist.ByteArrayClassPath;
+import oss.guido.javassist.ClassPool;
+import oss.guido.javassist.CtClass;
+import oss.guido.javassist.CtMethod;
+import oss.guido.javassist.LoaderClassPath;
+import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
+import oss.guido.net.logstash.logback.encoder.LogstashEncoder;
+
 public class GuidoTransformer implements ClassFileTransformer {
 	
-	private ClassPool pool;
-
-	public GuidoTransformer() {
-		pool = ClassPool.getDefault();
-	}
+	private Logger LOG;
 	
 	List<Class<?>> addedClassLoader = new ArrayList<Class<?>>();
+	ClassPool pool;
+	LinkedBlockingDeque<String> queue = new LinkedBlockingDeque<String>();
+	
+	public GuidoTransformer() {
+		createLogger();
+		createDefaults();
+		startQListener();
+		setPid();
+	}
+	
+	private void setPid() {
+		String pid = UUID.randomUUID().toString();
+		GuidoInterceptor.pid = pid;
+	}
 
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private void createLogger() {
+		String logmaticKey = getPropOrEnv("guido.logmaticKey");
+		if(logmaticKey == null) {
+			throw new RuntimeException("guido.logmaticKey is missing - set it as -Dguido.logmaticKey=x or in a guido.logmaticKey env property");
+		}
+		String destination = getPropOrEnv("guido.destination", "api.logmatic.io:10514");
+		LoggerContext loggerContext = new LoggerContext();
+		
+		LogstashEncoder encoder = new LogstashEncoder();
+		encoder.setCustomFields(String.format("{\"logmaticKey\":\"%s\"}", logmaticKey));
+		encoder.start();
+		
+		LogstashTcpSocketAppender tcpSocketAppender = new LogstashTcpSocketAppender();
+		tcpSocketAppender.addDestination(destination);
+		tcpSocketAppender.setKeepAliveDuration(Duration.buildByMinutes(1));
+		tcpSocketAppender.setEncoder(encoder);
+		tcpSocketAppender.setContext(loggerContext);
+		tcpSocketAppender.start();
+
+		LOG = loggerContext.getLogger("json_tcp");
+		LOG.setLevel(Level.INFO);
+		LOG.addAppender(tcpSocketAppender);
+		if(getPropOrEnv("guido.showLogsOnConsole") != null) {
+			ConsoleAppender consoleAppender = new ConsoleAppender();
+			LogstashEncoder consoleEncoder = new LogstashEncoder();
+			consoleEncoder.start();
+			consoleAppender.setEncoder(consoleEncoder);
+			consoleAppender.setContext(loggerContext);
+			consoleAppender.start();
+			LOG.addAppender(consoleAppender);
+		}
+		LOG.setAdditive(false);
+		loggerContext.start();
+	}
+	
+	private String getPropOrEnv(String name, String defaultValue) {
+		String value = System.getProperty(name);
+		if(value == null) {
+			value = System.getenv(name);
+		}
+		return (value == null) ? defaultValue : value;
+	}
+	
+	private String getPropOrEnv(String name) {
+		return getPropOrEnv(name, null);
+	}
+
+	private void createDefaults() {
+		pool = ClassPool.getDefault();
+		GuidoInterceptor.queue = queue;
+	}
+	
+	private void startQListener() {
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				for(;;) {
+					try {
+						String message = queue.take();
+						//info(message);
+						LOG.info(message);
+					} catch(InterruptedException ie) {
+						error("ie exception in loop take()", ie);
+						return;
+					} catch(Exception e) {
+						error("exception in loop take()", e);
+					}
+				}
+			}
+		}).start();
+	}
+	
 	@Override
 	public byte[] transform(ClassLoader loader, 
 								String className,
@@ -118,7 +212,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 				CtClass interceptorCtClass = pool.get(GuidoInterceptor.class.getCanonicalName());
 				Class<?> interceptorClass = interceptorCtClass.toClass(loader, protectionDomain);
-				interceptorClass.getDeclaredConstructor(Object.class).newInstance(GuidoInterceptor.references);
+				Map<String, Object> params = new HashMap<String, Object>();
+				params.put("refs", GuidoInterceptor.references);
+				params.put("logQ", queue);
+				params.put("pid", GuidoInterceptor.pid);
+				interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
 				debug("@@@@ forcing load of Guido classes done.");
 			} catch(Exception e) {
 				error("cannot force " 

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration debug="true">
+	<appender name="JSON" class="oss.guido.ch.qos.logback.core.ConsoleAppender">
+		<encoder class="oss.guido.net.logstash.logback.encoder.LogstashEncoder"/>
+	</appender>
+	
+	<appender name="JSON_TCP" class="oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender">
+		<remoteHost>api.logmatic.io</remoteHost>
+	  <port>10514</port>
+	  <keepAliveDuration>1 minute</keepAliveDuration>
+		<encoder class="oss.guido.net.logstash.logback.encoder.LogstashEncoder">
+			<customFields>{"logmaticKey":"qhcafwA2QIC8-7QZ0rvXcA"}</customFields>
+		</encoder>
+	</appender>
+	<root level=info>
+		<appender-ref ref="JSON_TCP" />
+		<appender-ref ref="JSON" />
+	</root>
+</configuration>
