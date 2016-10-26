@@ -3,6 +3,11 @@ package org.guido.agent.transformer;
 import static org.guido.agent.transformer.interceptor.GuidoInterceptor.addCatch;
 import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertAfter;
 import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertBefore;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_ALLOWED;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_CLASS_NAME;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_SIGNATURE;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.TOTAL_REF;
 import static org.guido.agent.transformer.logger.GuidoLogger.debug;
 import static org.guido.agent.transformer.logger.GuidoLogger.error;
 import static org.guido.agent.transformer.logger.GuidoLogger.info;
@@ -27,6 +32,7 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.transformer.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
+import org.guido.agent.transformer.interceptor.ReferenceIndex;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
 
@@ -51,7 +57,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	List<Class<?>> addedClassLoader = new ArrayList<Class<?>>();
 	ClassPool pool;
 	LinkedBlockingDeque<String> queue = new LinkedBlockingDeque<String>();
-	List<Map<String, Object>> references = new ArrayList<Map<String, Object>>(32 * 1024);
+	List<Object[]> references = new ArrayList<Object[]>(32 * 1024);
 	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
 	Map<String, String> extraProps = new HashMap<String, String>();
 	private long threshold;
@@ -160,8 +166,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 
 	private boolean isReferenceDifferent(int index, PatternMethodConfig newConfig) {
 		boolean changed =  
-				(boolean)references.get(index).get("allowed") != newConfig.isAllowed()
-				|| (long)references.get(index).get("threshold") != (newConfig.getThreshold() == -1 ? threshold : newConfig.getThreshold());
+				(boolean)references.get(index)[REF_ALLOWED] != newConfig.isAllowed()
+				|| (long)references.get(index)[REF_THRESHOLD] != (newConfig.getThreshold() == -1 ? threshold : newConfig.getThreshold());
 		return changed;
 	}
 
@@ -240,16 +246,12 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return referenceNumber;
 	}
 	
-	private Map<String, Object> newMethodReference(CtMethod method) {
-		Map<String, Object> ref = new HashMap<String, Object>();
-		ref.put("allowed", Boolean.TRUE);
-		ref.put("threshold", threshold);
-		ref.put("class", method.getDeclaringClass());
-		ref.put("className", method.getDeclaringClass().getSimpleName());
-		ref.put("longName", method.getLongName());
-		ref.put("name", method.getName());
-		ref.put("shortSignature", method.getDeclaringClass().getName() + "." + method.getName());
-		ref.put("signature", Descriptor.toString(method.getSignature()));
+	private Object[] newMethodReference(CtMethod method) {
+		Object[] ref = new Object[TOTAL_REF];
+		ref[REF_ALLOWED] = true;
+		ref[REF_CLASS_NAME] = method.getDeclaringClass().getSimpleName();
+		ref[REF_SHORT_SIGNATURE] = method.getDeclaringClass().getName() + "." + method.getName();
+		ref[REF_THRESHOLD] = threshold;
 		return ref;
 	}
 	
@@ -339,10 +341,10 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 
 	private void updateReference(int index, PatternMethodConfig config) {
-		Map<String, Object> reference = references.get(index);
-		reference.put("allowed", config.isAllowed());
+		Object[] reference = references.get(index);
+		reference[REF_ALLOWED] = config.isAllowed();
 		long configThreshold = config.getThreshold();
-		reference.put("threshold", configThreshold == -1 ? threshold : configThreshold);
+		reference[REF_THRESHOLD] = (configThreshold == -1 ? threshold : configThreshold);
 	}
 
 	private boolean isElligeable(CtClass cclass, CtMethod method) {
