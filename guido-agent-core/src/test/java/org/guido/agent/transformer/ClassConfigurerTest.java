@@ -42,6 +42,7 @@ public class ClassConfigurerTest {
 	@Test
 	public void canCheckSimpleClass() throws Exception {
 		ClassConfigurer configurer = new ClassConfigurer();
+		configurer.startConfigure();
 		
 		// no configuration, all allowed
 		CtClass driver = pool.get("org.postgresql.Driver");
@@ -75,6 +76,7 @@ public class ClassConfigurerTest {
 		CtClass driver = pool.get("org.postgresql.Driver");
 		CtClass itf = pool.get("java.sql.Driver");
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
+		configurer.startConfigure();
 		configurer.addLine("**=off");
 		configurer.addLine("java.sql.Driver.*=on");
 		configurer.endConfigure();
@@ -92,6 +94,7 @@ public class ClassConfigurerTest {
 		CtClass driver = pool.get("org.postgresql.jdbc.PgConnection");
 		CtClass itf = pool.get("java.sql.Connection");
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
+		configurer.startConfigure();
 		configurer.addLine("**=off");
 		configurer.addLine("java.sql.Connection.*=on");
 		configurer.endConfigure();

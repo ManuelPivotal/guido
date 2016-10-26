@@ -22,7 +22,7 @@ public class ClassConfigurer {
 	
 	boolean loadInError = false;
 	List<PerClassConfig> perClassConfigs = new ArrayList<PerClassConfig>();
-	List<PerClassConfig> tmpPerClassConfigs = new ArrayList<PerClassConfig>();
+	List<PerClassConfig> tmpPerClassConfigs; // = new ArrayList<PerClassConfig>();
 	
 	PerClassConfig notAllowedConfig = new PerClassConfig(null, -1, false);
 	PerClassConfig allowedConfig = new PerClassConfig(null, -1, true);
@@ -38,10 +38,8 @@ public class ClassConfigurer {
 		perClassConfigs = tmpPerClassConfigs;
 	}
 	
-	public void reset() {
-		while(!perClassConfigs.isEmpty()) {
-			perClassConfigs.remove(0);
-		}
+	public void startConfigure() {
+		tmpPerClassConfigs = new ArrayList<PerClassConfig>();
 	}
 	
 	void loadClassConfigFromFile(String fileName) {
@@ -49,6 +47,7 @@ public class ClassConfigurer {
 		File configFile = new File(fileName);
 		try(BufferedReader reader = new BufferedReader(new FileReader(fileName))) {
 			String line;
+			startConfigure();
 			while((line = reader.readLine()) != null) {
 				addLine(line);
 			}
