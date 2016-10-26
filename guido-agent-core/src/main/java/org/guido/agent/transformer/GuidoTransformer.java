@@ -32,7 +32,6 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.transformer.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
-import org.guido.agent.transformer.interceptor.ReferenceIndex;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
 
@@ -47,8 +46,8 @@ import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.LoaderClassPath;
-import oss.guido.javassist.bytecode.Descriptor;
 import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
+import oss.guido.org.slf4j.MDC;
 
 public class GuidoTransformer implements ClassFileTransformer {
 	
@@ -66,6 +65,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	String propEx = "guido.ext.";
 	int propExLength = propEx.length();
 	MessageAddon[] addons = new MessageAddon[0];
+	int logQListeners = 1;
 	
 	public GuidoTransformer() {
 		getExtraProps();
@@ -74,10 +74,15 @@ public class GuidoTransformer implements ClassFileTransformer {
 		buildAddons();
 		createLogger();
 		createDefaults();
-		startQListener();
+		getQListenersCount();
+		startQListeners();
 		setPid();
 	}
 	
+	private void getQListenersCount() {
+		logQListeners = Integer.valueOf(PropsUtil.getPropOrEnv("guido.logqlisteners", "3"));
+	}
+
 	MessageAddon dateAddon = new MessageAddon() {
 		@Override
 		public String getAddon(ILoggingEvent event) {
@@ -85,6 +90,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 			return format.format(new Date(event.getTimeStamp()));
 		}
 	};
+	
+	abstract class InitMessageAddon implements MessageAddon {
+		public InitMessageAddon() {
+			initMessage();
+		}
+		abstract void initMessage();
+	}
 	
 	private void buildAddons() {
 		addons = new MessageAddon[] {
@@ -95,10 +107,15 @@ public class GuidoTransformer implements ClassFileTransformer {
 						return extraProps.get("hostname");
 					}
 				},
-				new MessageAddon() {
+				new InitMessageAddon() {
+					String message;
+					@Override
+					void initMessage() {
+						message = "[" +extraProps.get("facility") + "]";
+					}
 					@Override
 					public String getAddon(ILoggingEvent event) {
-						return extraProps.get("facility");
+						return message;
 					}
 				},
 				new MessageAddon() {
@@ -147,15 +164,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		synchronized(references) {
 			for(int index = 0; index < methods.size(); index++) {
 				PatternMethodConfig newConfig = classConfigurer.configFor(methods.get(index));
-				boolean changed = isReferenceDifferent(index, newConfig);
-//				GuidoLogger.debug("Current is [" 
-//						+ references.get(index).get("allowed")
-//						+ ", " + references.get(index).get("threshold")  + "] new is ["
-//						+ newConfig.isAllowed() + "," + newConfig.getThreshold() + "] -> " + changed 
-//						+ " for " + methods.get(index).getDeclaringClass().getName()
-//					);
-				if(changed) {
-					//GuidoLogger.debug("config has changed for " + methods.get(index).getLongName());
+				if(isReferenceDifferent(index, newConfig)) {
 					updateReference(index, newConfig);
 					totalChanged++;
 				}
@@ -220,9 +229,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 			LOG.addAppender(tcpSocketAppender);
 		}
 		
-//		for(Entry<String, String> prop : extraProps.entrySet()) {
-//			MDC.put(prop.getKey(), prop.getValue());
-//		}
+		for(Entry<String, String> prop : extraProps.entrySet()) {
+			MDC.put(prop.getKey(), prop.getValue());
+		}
 		
 		LOG.setAdditive(false);
 		loggerContext.start();
@@ -255,23 +264,25 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return ref;
 	}
 	
-	private void startQListener() {
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				for(;;) {
-					try {
-						String message = queue.take();
-						LOG.info(message);
-					} catch(InterruptedException ie) {
-						error("ie exception in loop take()", ie);
-						return;
-					} catch(Exception e) {
-						error("exception in loop take()", e);
+	private void startQListeners() {
+		for(int index = 0; index < logQListeners; index++) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					for(;;) {
+						try {
+							String message = queue.take();
+							LOG.info(message);
+						} catch(InterruptedException ie) {
+							error("ie exception in loop take()", ie);
+							return;
+						} catch(Exception e) {
+							error("exception in loop take()", e);
+						}
 					}
 				}
-			}
-		}).start();
+			}).start();
+		}
 	}
 	
 	@Override
@@ -385,21 +396,29 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 				CtClass interceptorCtClass = pool.get(GuidoInterceptor.class.getCanonicalName());
 				Class<?> interceptorClass = interceptorCtClass.toClass(loader, protectionDomain);
-				Map<String, Object> params = new HashMap<String, Object>();
-				params.put("refs", GuidoInterceptor.references);
-				params.put("logQ", queue);
-				params.put("pid", GuidoInterceptor.pid);
-				params.put("threshold", GuidoInterceptor.threshold);
-				params.put("extraprops", GuidoInterceptor.extraProps);
+				Map<String, Object> params = buildConstructorArg();
 				interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
-				debug("@@@@ forcing load of Guido classes done.");
 			} catch(Exception e) {
 				error("cannot force " 
 						+ loader.getClass() 
 						+ " to load guido classes." 
 						, e);
+				return;
+			} catch(LinkageError le) {
+				// already in the class loader space
 			}
+			debug("@@@@ forcing load of Guido classes done.");
 		}
+	}
+
+	private Map<String, Object> buildConstructorArg() {
+		Map<String, Object> params = new HashMap<String, Object>();
+		params.put("refs", GuidoInterceptor.references);
+		params.put("logQ", queue);
+		params.put("pid", GuidoInterceptor.pid);
+		params.put("threshold", GuidoInterceptor.threshold);
+		params.put("extraprops", GuidoInterceptor.extraProps);
+		return params;
 	}
 	
 	private boolean isObservableClass(CtClass cclass) {
@@ -445,9 +464,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 	
 	private boolean isObservableByName(CtClass cclass) {
 		String className = cclass.getName();
-		if(className.contains("telaside")) {
-			return true;
-		}
 		for(String forbiddenStart : forbiddenStarts) {
 			if(className.startsWith(forbiddenStart)) {
 				return false;
