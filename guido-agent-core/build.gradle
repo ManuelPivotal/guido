@@ -21,11 +21,11 @@ repositories {
 dependencies {
 	compile project(':guido-agent-oss')
 	
-	testCompile 'org.postgresql:postgresql:9.4.1211.jre7'
 	testCompile 'junit:junit:4.10'
-	// https://mvnrepository.com/artifact/org.springframework.data/spring-data-jpa
+	testCompile group: 'org.mockito', name: 'mockito-all', version: '1.10.19'
+	// jar with exotic class graphs for testing the class rules
+	testCompile 'org.postgresql:postgresql:9.4.1211.jre7'
 	testCompile group: 'org.springframework.data', name: 'spring-data-jpa', version: '1.10.4.RELEASE'
-	
 }
 
 task fatJar(type: Jar) {
@@ -49,8 +49,6 @@ task fatJar(type: Jar) {
 	}
 	with jar
 }
-
-
 
 test {
     systemProperties 'property': 'value'

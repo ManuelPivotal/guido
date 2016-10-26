@@ -1,11 +1,11 @@
 package org.guido.agent.transformer;
 
-public class PerClassConfig {
+public class PatternMethodConfig {
 	String className;
 	boolean allowed;
 	long threshold;
 	
-	public PerClassConfig(String className, long threshold, boolean allowed) {
+	public PatternMethodConfig(String className, long threshold, boolean allowed) {
 		this.className = className;
 		this.threshold = threshold;
 		this.allowed = allowed;

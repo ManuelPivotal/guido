@@ -14,18 +14,18 @@ import org.guido.util.AntPathMatcher;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 
-public class ClassConfigurer {
+public class PatternMethodConfigurer {
 	
 	public interface Reload {
 		void doReload();
 	}
 	
 	boolean loadInError = false;
-	List<PerClassConfig> perClassConfigs = new ArrayList<PerClassConfig>();
-	List<PerClassConfig> tmpPerClassConfigs; // = new ArrayList<PerClassConfig>();
+	List<PatternMethodConfig> perClassConfigs = new ArrayList<PatternMethodConfig>();
+	List<PatternMethodConfig> tmpPerClassConfigs; // = new ArrayList<PerClassConfig>();
 	
-	PerClassConfig notAllowedConfig = new PerClassConfig(null, -1, false);
-	PerClassConfig allowedConfig = new PerClassConfig(null, -1, true);
+	PatternMethodConfig notAllowedConfig = new PatternMethodConfig(null, -1, false);
+	PatternMethodConfig allowedConfig = new PatternMethodConfig(null, -1, true);
 	
 	AntPathMatcher pathMatcher = new AntPathMatcher();
 	boolean hasDynamicConfiguration;
@@ -33,13 +33,14 @@ public class ClassConfigurer {
 	
 	/*
 	 classname=threshold:x,on,off
+	 classname is an ant like path with . as separator.
 	 */
 	void endConfigure() {
 		perClassConfigs = tmpPerClassConfigs;
 	}
 	
 	public void startConfigure() {
-		tmpPerClassConfigs = new ArrayList<PerClassConfig>();
+		tmpPerClassConfigs = new ArrayList<PatternMethodConfig>();
 	}
 	
 	void loadClassConfigFromFile(String fileName) {
@@ -68,13 +69,13 @@ public class ClassConfigurer {
 		if(line.startsWith("#")) {
 			return;
 		}
-		PerClassConfig classConfig = parseLine(line);
+		PatternMethodConfig classConfig = parseLine(line);
 		if(classConfig != null) {
 			tmpPerClassConfigs.add(classConfig);
 		}
 	}
 
-	PerClassConfig parseLine(String line) {
+	PatternMethodConfig parseLine(String line) {
 		String[] split = line.split("=");
 		if(split.length != 2) {
 			return null;
@@ -93,7 +94,7 @@ public class ClassConfigurer {
 				allowed = false;
 			}
 		}
-		return new PerClassConfig(className, threshold, allowed);
+		return new PatternMethodConfig(className, threshold, allowed);
 	}
 
 	public void loadClassConfig(final String configFile, final Reload reload) {
@@ -129,13 +130,13 @@ public class ClassConfigurer {
 		return hasDynamicConfiguration;
 	}
 
-	public PerClassConfig configFor(CtMethod method) {
-		PerClassConfig config = configFor(method.getDeclaringClass(), method);
+	public PatternMethodConfig configFor(CtMethod method) {
+		PatternMethodConfig config = configFor(method.getDeclaringClass(), method);
 		if(!config.allowed) {
 			//debug("not allowed at first, checking interfaces");
 			if(configForInterfaces(method.getDeclaringClass(), method)) {
 				//debug("found in interfarces");
-				return new PerClassConfig(config.className, config.threshold, true);
+				return new PatternMethodConfig(config.className, config.threshold, true);
 			} else {
 				return notAllowedConfig;
 			}
@@ -170,10 +171,10 @@ public class ClassConfigurer {
 		}
 	}
 
-	protected PerClassConfig configFor(CtClass clazz, CtMethod method) {
+	protected PatternMethodConfig configFor(CtClass clazz, CtMethod method) {
 		String methodName = clazz.getName() +  "." + method.getName();
 		boolean notAllowed = false;
-		for(PerClassConfig config : perClassConfigs) {
+		for(PatternMethodConfig config : perClassConfigs) {
 			if(pathMatcher.match(config.className, methodName)) {
 				//debug("match for " + config.className + ", path " + methodName);
 				if(!config.allowed) {

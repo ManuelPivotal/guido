@@ -25,7 +25,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
-import org.guido.agent.transformer.ClassConfigurer.Reload;
+import org.guido.agent.transformer.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
@@ -55,7 +55,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
 	Map<String, String> extraProps = new HashMap<String, String>();
 	private long threshold;
-	private ClassConfigurer classConfigurer;
+	private PatternMethodConfigurer classConfigurer;
 	
 	String propEx = "guido.ext.";
 	int propExLength = propEx.length();
@@ -123,7 +123,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 
 	private void loadClassConfigurer() {
-		classConfigurer = new ClassConfigurer();
+		classConfigurer = new PatternMethodConfigurer();
 		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
 		if(configFile != null) {
 			classConfigurer.loadClassConfig(PropsUtil.getPropOrEnv("guido.classconfig"), new Reload() {
@@ -140,7 +140,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		int totalChanged = 0;
 		synchronized(references) {
 			for(int index = 0; index < methods.size(); index++) {
-				PerClassConfig newConfig = classConfigurer.configFor(methods.get(index));
+				PatternMethodConfig newConfig = classConfigurer.configFor(methods.get(index));
 				boolean changed = isReferenceDifferent(index, newConfig);
 //				GuidoLogger.debug("Current is [" 
 //						+ references.get(index).get("allowed")
@@ -158,7 +158,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		GuidoLogger.info("Modifying method definitions - " + totalChanged + "/" + methods.size() + " method(s) modified");
 	}
 
-	private boolean isReferenceDifferent(int index, PerClassConfig newConfig) {
+	private boolean isReferenceDifferent(int index, PatternMethodConfig newConfig) {
 		boolean changed =  
 				(boolean)references.get(index).get("allowed") != newConfig.isAllowed()
 				|| (long)references.get(index).get("threshold") != (newConfig.getThreshold() == -1 ? threshold : newConfig.getThreshold());
@@ -317,7 +317,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 						if(isElligeable(cclass, method)) {
 							try {
 								int index = createReference(method);
-								PerClassConfig config = classConfigurer.configFor(method);
+								PatternMethodConfig config = classConfigurer.configFor(method);
 								updateReference(index, config);
 								method.insertBefore(insertBefore(index));
 								method.insertAfter(insertAfter());
@@ -338,7 +338,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return null;
 	}
 
-	private void updateReference(int index, PerClassConfig config) {
+	private void updateReference(int index, PatternMethodConfig config) {
 		Map<String, Object> reference = references.get(index);
 		reference.put("allowed", config.isAllowed());
 		long configThreshold = config.getThreshold();

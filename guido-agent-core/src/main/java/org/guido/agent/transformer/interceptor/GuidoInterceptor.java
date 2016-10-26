@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-import org.guido.agent.transformer.PerClassConfig;
+import org.guido.agent.transformer.PerMethodConfig;
 import org.guido.agent.transformer.logger.GuidoLogger;
 
 import oss.guido.javassist.CtMethod;
@@ -42,7 +42,7 @@ public class GuidoInterceptor {
 		InThreadStackElement.class,
 		SimpleOpInteger.class,
 		GuidoLogger.class,
-		PerClassConfig.class
+		PerMethodConfig.class
 	};
 	
 	static ThreadLocal<String> threadUuid = new ThreadLocal<String>();

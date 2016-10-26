@@ -25,8 +25,8 @@ public class ClassConfigurerTest {
 	
 	@Test
 	public void canParseConfigurationLine() {
-		ClassConfigurer configurer = new ClassConfigurer();
-		PerClassConfig lineConfig;
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
+		PatternMethodConfig lineConfig;
 		
 		lineConfig = configurer.parseLine("*=threshold:20,off");
 		Assert.assertEquals("*", lineConfig.getClassName());
@@ -41,13 +41,13 @@ public class ClassConfigurerTest {
 	
 	@Test
 	public void canCheckSimpleClass() throws Exception {
-		ClassConfigurer configurer = new ClassConfigurer();
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
 		configurer.startConfigure();
 		
 		// no configuration, all allowed
 		CtClass driver = pool.get("org.postgresql.Driver");
 		for(CtMethod method : driver.getDeclaredMethods()) {
-			PerClassConfig methodConfig = configurer.configFor(method);
+			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed());
 		}
 
@@ -55,7 +55,7 @@ public class ClassConfigurerTest {
 		configurer.addLine("**=off");
 		configurer.endConfigure();
 		for(CtMethod method : driver.getDeclaredMethods()) {
-			PerClassConfig methodConfig = configurer.configFor(method);
+			PatternMethodConfig methodConfig = configurer.configFor(method);
 			GuidoLogger.debug(methodConfig + " for " + method.getLongName());
 			Assert.assertEquals(false, methodConfig.isAllowed());
 		}
@@ -64,14 +64,14 @@ public class ClassConfigurerTest {
 		configurer.addLine("org.postgresql.Driver.*=on");
 		configurer.endConfigure();
 		for(CtMethod method : driver.getDeclaredMethods()) {
-			PerClassConfig methodConfig = configurer.configFor(method);
+			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed());
 		}
 	}
 	
 	@Test
 	public void canCheckSimpleInterfaces() throws Exception {
-		ClassConfigurer configurer = new ClassConfigurer();
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
 
 		CtClass driver = pool.get("org.postgresql.Driver");
 		CtClass itf = pool.get("java.sql.Driver");
@@ -82,14 +82,14 @@ public class ClassConfigurerTest {
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
-			PerClassConfig methodConfig = configurer.configFor(method);
+			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed() == methods.contains(method));
 		}
 	}
 
 	@Test
 	public void canCheckInheritedInterfaces() throws Exception {
-		ClassConfigurer configurer = new ClassConfigurer();
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
 
 		CtClass driver = pool.get("org.postgresql.jdbc.PgConnection");
 		CtClass itf = pool.get("java.sql.Connection");
@@ -100,7 +100,7 @@ public class ClassConfigurerTest {
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
-			PerClassConfig methodConfig = configurer.configFor(method);
+			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed() == methods.contains(method));
 		}
 	}
