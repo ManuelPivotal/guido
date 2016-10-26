@@ -11,19 +11,29 @@ import static org.guido.util.PropsUtil.getPropOrEnv;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
+import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
+import org.guido.agent.logs.provider.GuidoLogstashEncoder;
+import org.guido.agent.transformer.ClassConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
+import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
 
 import oss.guido.ch.qos.logback.classic.Level;
 import oss.guido.ch.qos.logback.classic.Logger;
 import oss.guido.ch.qos.logback.classic.LoggerContext;
+import oss.guido.ch.qos.logback.classic.spi.ILoggingEvent;
 import oss.guido.ch.qos.logback.core.ConsoleAppender;
 import oss.guido.ch.qos.logback.core.util.Duration;
 import oss.guido.javassist.ByteArrayClassPath;
@@ -33,7 +43,6 @@ import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.LoaderClassPath;
 import oss.guido.javassist.bytecode.Descriptor;
 import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
-import oss.guido.net.logstash.logback.encoder.LogstashEncoder;
 
 public class GuidoTransformer implements ClassFileTransformer {
 	
@@ -43,21 +52,117 @@ public class GuidoTransformer implements ClassFileTransformer {
 	ClassPool pool;
 	LinkedBlockingDeque<String> queue = new LinkedBlockingDeque<String>();
 	List<Map<String, Object>> references = new ArrayList<Map<String, Object>>(32 * 1024);
+	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
+	Map<String, String> extraProps = new HashMap<String, String>();
 	private long threshold;
 	private ClassConfigurer classConfigurer;
 	
+	String propEx = "guido.ext.";
+	int propExLength = propEx.length();
+	MessageAddon[] addons = new MessageAddon[0];
+	
 	public GuidoTransformer() {
+		getExtraProps();
 		loadClassConfigurer();
 		getMethodThreshold();
+		buildAddons();
 		createLogger();
 		createDefaults();
 		startQListener();
 		setPid();
 	}
 	
+	MessageAddon dateAddon = new MessageAddon() {
+		@Override
+		public String getAddon(ILoggingEvent event) {
+			SimpleDateFormat format = new SimpleDateFormat("MMM d HH:mm:ss");
+			return format.format(new Date(event.getTimeStamp()));
+		}
+	};
+	
+	private void buildAddons() {
+		addons = new MessageAddon[] {
+				dateAddon,
+				new MessageAddon() {
+					@Override
+					public String getAddon(ILoggingEvent event) {
+						return extraProps.get("hostname");
+					}
+				},
+				new MessageAddon() {
+					@Override
+					public String getAddon(ILoggingEvent event) {
+						return extraProps.get("facility");
+					}
+				},
+				new MessageAddon() {
+					@Override
+					public String getAddon(ILoggingEvent event) {
+						return "PERF";
+					}
+				},
+				new MessageAddon() {
+					@Override
+					public String getAddon(ILoggingEvent event) {
+						return "[" + event.getThreadName() + "]";
+					}
+				}
+		};
+	}
+
+	private void getExtraProps() {
+		Properties properties = System.getProperties();
+		if(properties != null) {
+			for(Entry<Object, Object> prop : properties.entrySet()) {
+				String key = (String)prop.getKey();
+				if(key.startsWith("guido.ext.") && key.length() > propExLength) {
+					extraProps.put(key.substring(propExLength), (String)prop.getValue());
+				}
+			}
+		}
+	}
+
 	private void loadClassConfigurer() {
 		classConfigurer = new ClassConfigurer();
-		classConfigurer.loadClassConfig();
+		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
+		if(configFile != null) {
+			classConfigurer.loadClassConfig(PropsUtil.getPropOrEnv("guido.classconfig"), new Reload() {
+				@Override
+				public void doReload() {
+					reloadAllReferences();
+				}
+			});
+		}
+	}
+
+	protected void reloadAllReferences() {
+		GuidoLogger.info("Start modifying class definitions");
+		int totalChanged = 0;
+		synchronized(references) {
+			for(int index = 0; index < methods.size(); index++) {
+				PerClassConfig newConfig = classConfigurer.configFor(methods.get(index));
+				boolean changed = isReferenceDifferent(index, newConfig);
+//				GuidoLogger.debug("Current is [" 
+//						+ references.get(index).get("allowed")
+//						+ ", " + references.get(index).get("threshold")  + "] new is ["
+//						+ newConfig.isAllowed() + "," + newConfig.getThreshold() + "] -> " + changed 
+//						+ " for " + methods.get(index).getDeclaringClass().getName()
+//					);
+				if(changed) {
+					//GuidoLogger.debug("config has changed for " + methods.get(index).getLongName());
+					updateReference(index, newConfig);
+					totalChanged++;
+				}
+			}
+		}
+		GuidoLogger.info("Modifying method definitions - " + totalChanged + "/" + methods.size() + " method(s) modified");
+	}
+
+	private boolean isReferenceDifferent(int index, PerClassConfig newConfig) {
+		boolean changed =  
+				(boolean)references.get(index).get("allowed") != newConfig.isAllowed()
+				|| (long)references.get(index).get("threshold") != (newConfig.getThreshold() == -1 ? threshold : newConfig.getThreshold());
+		return changed;
 	}
 
 	private void getMethodThreshold() {
@@ -79,7 +184,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 		String destination = getPropOrEnv("guido.destination", "api.logmatic.io:10514");
 		LoggerContext loggerContext = new LoggerContext();
 		
-		LogstashEncoder encoder = new LogstashEncoder();
+		GuidoLogstashEncoder encoder = new GuidoLogstashEncoder();
+		encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
 		String appName = getPropOrEnv("guido.appname", "default-app-name");
 		
 		encoder.setCustomFields(String.format("{\"logmaticKey\":\"%s\", \"appname\" : \"%s\"}", logmaticKey, appName));
@@ -97,7 +203,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 		
 		if(getPropOrEnv("guido.showLogsOnConsole") != null) {
 			ConsoleAppender consoleAppender = new ConsoleAppender();
-			LogstashEncoder consoleEncoder = new LogstashEncoder();
+			GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
+			encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
 			consoleEncoder.start();
 			consoleAppender.setEncoder(consoleEncoder);
 			consoleAppender.setContext(loggerContext);
@@ -106,6 +213,10 @@ public class GuidoTransformer implements ClassFileTransformer {
 		} else {
 			LOG.addAppender(tcpSocketAppender);
 		}
+		
+//		for(Entry<String, String> prop : extraProps.entrySet()) {
+//			MDC.put(prop.getKey(), prop.getValue());
+//		}
 		
 		LOG.setAdditive(false);
 		loggerContext.start();
@@ -116,12 +227,14 @@ public class GuidoTransformer implements ClassFileTransformer {
 		GuidoInterceptor.queue = queue;
 		GuidoInterceptor.references = references;
 		GuidoInterceptor.threshold = threshold;
+		GuidoInterceptor.extraProps = extraProps;
 	}
 	
 	private int createReference(CtMethod method) {
 		int referenceNumber;
 		synchronized(references) {
 			references.add(newMethodReference(method));
+			methods.add(method);
 			referenceNumber = references.size() - 1;
 		}
 		return referenceNumber;
@@ -132,7 +245,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		ref.put("allowed", Boolean.TRUE);
 		ref.put("threshold", threshold);
 		ref.put("class", method.getDeclaringClass());
-		ref.put("className", method.getDeclaringClass().getName());
+		ref.put("className", method.getDeclaringClass().getSimpleName());
 		ref.put("longName", method.getLongName());
 		ref.put("name", method.getName());
 		ref.put("shortSignature", method.getDeclaringClass().getName() + "." + method.getName());
@@ -204,6 +317,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 						if(isElligeable(cclass, method)) {
 							try {
 								int index = createReference(method);
+								PerClassConfig config = classConfigurer.configFor(method);
+								updateReference(index, config);
 								method.insertBefore(insertBefore(index));
 								method.insertAfter(insertAfter());
 								CtClass etype = pool.get("java.lang.Throwable");
@@ -221,6 +336,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 			error("Error while transforming " + className, e);
 		}
 		return null;
+	}
+
+	private void updateReference(int index, PerClassConfig config) {
+		Map<String, Object> reference = references.get(index);
+		reference.put("allowed", config.isAllowed());
+		long configThreshold = config.getThreshold();
+		reference.put("threshold", configThreshold == -1 ? threshold : configThreshold);
 	}
 
 	private boolean isElligeable(CtClass cclass, CtMethod method) {
@@ -266,6 +388,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 				params.put("logQ", queue);
 				params.put("pid", GuidoInterceptor.pid);
 				params.put("threshold", GuidoInterceptor.threshold);
+				params.put("extraprops", GuidoInterceptor.extraProps);
 				interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
 				debug("@@@@ forcing load of Guido classes done.");
 			} catch(Exception e) {

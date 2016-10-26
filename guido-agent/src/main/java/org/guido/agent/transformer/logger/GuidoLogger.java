@@ -45,6 +45,7 @@ public class GuidoLogger {
 			System.out.println(t.getMessage());
 			//t.printStackTrace();
 		}
+		System.out.flush();
 	}
 	
 

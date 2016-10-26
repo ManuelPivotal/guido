@@ -5,7 +5,6 @@ import java.util.List;
 
 import junit.framework.Assert;
 
-import org.guido.agent.transformer.ClassConfigurer.PerClassConfig;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -53,6 +52,7 @@ public class ClassConfigurerTest {
 
 		// all off
 		configurer.addLine("**=off");
+		configurer.endConfigure();
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PerClassConfig methodConfig = configurer.configFor(method);
 			GuidoLogger.debug(methodConfig + " for " + method.getLongName());
@@ -61,6 +61,7 @@ public class ClassConfigurerTest {
 
 		// add driver only
 		configurer.addLine("org.postgresql.Driver.*=on");
+		configurer.endConfigure();
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PerClassConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed());
@@ -76,6 +77,7 @@ public class ClassConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.addLine("**=off");
 		configurer.addLine("java.sql.Driver.*=on");
+		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PerClassConfig methodConfig = configurer.configFor(method);
@@ -92,6 +94,7 @@ public class ClassConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.addLine("**=off");
 		configurer.addLine("java.sql.Connection.*=on");
+		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PerClassConfig methodConfig = configurer.configFor(method);

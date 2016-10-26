@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import org.guido.agent.transformer.PerClassConfig;
 import org.guido.agent.transformer.logger.GuidoLogger;
 
 import oss.guido.javassist.CtMethod;
@@ -15,6 +16,7 @@ public class GuidoInterceptor {
 	static public Deque<String> queue;
 	public static String pid;
 	public static long threshold = 500000; // (0.5 ms)
+	static public Map<String, String> extraProps;
 	
 	public static final int MAX_STACK_DEPTH = 2047;
 	
@@ -33,12 +35,14 @@ public class GuidoInterceptor {
 		GuidoInterceptor.queue = (Deque)paramMap.get("logQ");
 		GuidoInterceptor.pid = (String)paramMap.get("pid");
 		GuidoInterceptor.threshold = (long)paramMap.get("threshold");
+		GuidoInterceptor.extraProps = (Map<String, String>)paramMap.get("extraprops");
 	}
 	
 	static public Class<?>[] toLoad = new Class<?>[] {
 		InThreadStackElement.class,
 		SimpleOpInteger.class,
-		GuidoLogger.class
+		GuidoLogger.class,
+		PerClassConfig.class
 	};
 	
 	static ThreadLocal<String> threadUuid = new ThreadLocal<String>();
@@ -82,7 +86,8 @@ public class GuidoInterceptor {
 			if(stackElement.deltaTime > (long)stackElement.reference.get("threshold") 
 					&& (Boolean)stackElement.reference.get("allowed")) {
 				StringBuffer sb = new StringBuffer(2048)
-					.append("pid=").append(pid)
+					.append(stackElement.reference.get("className"))
+					.append(" - pid=").append(pid)
 					.append(" threadUuid=").append(threadUuid.get())
 					.append(" depth=").append(positionInStack.get().get() + 1)
 					.append(" methodCalled=").append(stackElement.reference.get("shortSignature"))
@@ -100,17 +105,19 @@ public class GuidoInterceptor {
 	static public void popInError(Throwable t) {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
-			if(stackElement.deltaTime > threshold) {
-				String message = String.format("exception=%s pid=%s threadUuid=%s depth=%d methodCalled=%s durationInNS=%d",
-						t.getClass().getName(),
-						pid,
-						threadUuid.get(),
-						positionInStack.get().get() + 1,
-						stackElement.reference.get("shortSignature"),
-						stackElement.deltaTime
-						);
+			if(stackElement.deltaTime > (long)stackElement.reference.get("threshold") 
+					&& (Boolean)stackElement.reference.get("allowed")) {
+				StringBuffer sb = new StringBuffer(2048)
+					.append(stackElement.reference.get("className"))
+					.append(" - pid=").append(pid)
+					.append(" threadUuid=").append(threadUuid.get())
+					.append(" depth=").append(positionInStack.get().get() + 1)
+					.append(" methodCalled=").append(stackElement.reference.get("shortSignature"))
+					.append(" durationInNS=").append(stackElement.deltaTime)
+					.append(" exception=").append(t.getClass().getName())
+				;
 				totalsent++;
-				boolean offered = queue.offer(message);
+				boolean offered = queue.offer(sb.toString());
 				if(!offered) {
 					totalerror++;
 				}
