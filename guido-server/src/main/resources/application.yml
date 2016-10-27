@@ -1,0 +1,7 @@
+spring:
+  data:
+    mongodb:
+      uri : mongodb://guido
+
+server:
+  port: 8899

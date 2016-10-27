@@ -7,14 +7,18 @@ import oss.guido.com.fasterxml.jackson.core.JsonGenerator;
 import oss.guido.net.logstash.logback.composite.JsonWritingUtils;
 import oss.guido.net.logstash.logback.composite.loggingevent.MessageJsonProvider;
 
-public class GuidoJsonMessageProvider extends  MessageJsonProvider {
+public class GuidoJsonMessageProvider extends MessageJsonProvider {
 	
 	public interface MessageAddon {
 		String getAddon(ILoggingEvent event);
 	}
 	
+	static MessageAddon[] NO_ADDONS = new MessageAddon[0];
 	final protected MessageAddon[] addons;
-	
+
+	public GuidoJsonMessageProvider() {
+		addons = NO_ADDONS;
+	}
 	public GuidoJsonMessageProvider(MessageAddon[] addons) {
 		super();
 		this.addons = addons;

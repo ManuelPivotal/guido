@@ -1,3 +1,4 @@
 include 'guido-agent-oss'
 include 'guido-agent-core'
+include 'guido-server'
 include 'guido-ui'

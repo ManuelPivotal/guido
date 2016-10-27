@@ -5,6 +5,7 @@ import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertAft
 import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertBefore;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_ALLOWED;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_CLASS_NAME;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_COUNT;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_SIGNATURE;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.TOTAL_REF;
@@ -27,11 +28,14 @@ import java.util.Properties;
 import java.util.UUID;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.guido.agent.logs.provider.GuidoJsonJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
+import org.guido.agent.stats.ExponentialMovingAverageRate;
 import org.guido.agent.transformer.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
+import org.guido.agent.transformer.interceptor.ReferenceIndex;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
 
@@ -39,6 +43,7 @@ import oss.guido.ch.qos.logback.classic.Level;
 import oss.guido.ch.qos.logback.classic.Logger;
 import oss.guido.ch.qos.logback.classic.LoggerContext;
 import oss.guido.ch.qos.logback.classic.spi.ILoggingEvent;
+import oss.guido.ch.qos.logback.core.Appender;
 import oss.guido.ch.qos.logback.core.ConsoleAppender;
 import oss.guido.ch.qos.logback.core.util.Duration;
 import oss.guido.javassist.ByteArrayClassPath;
@@ -46,6 +51,7 @@ import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.LoaderClassPath;
+import oss.guido.net.logstash.logback.appender.LoggingEventAsyncDisruptorAppender;
 import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
 import oss.guido.org.slf4j.MDC;
 
@@ -55,7 +61,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	
 	List<Class<?>> addedClassLoader = new ArrayList<Class<?>>();
 	ClassPool pool;
-	LinkedBlockingDeque<String> queue = new LinkedBlockingDeque<String>();
+	LinkedBlockingDeque<Object[]> queue = new LinkedBlockingDeque<Object[]>();
 	List<Object[]> references = new ArrayList<Object[]>(32 * 1024);
 	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
 	Map<String, String> extraProps = new HashMap<String, String>();
@@ -67,6 +73,21 @@ public class GuidoTransformer implements ClassFileTransformer {
 	MessageAddon[] addons = new MessageAddon[0];
 	int logQListeners = 1;
 	
+	//LOG.info("{} - pid={} threadUuid={} depth={} methodCalled={} durationInNS={}", logContents);
+
+	String[] jsonFieldNames = new String[] {
+			null,
+			"pid", 
+			"threadUuid", 
+			"depth", 
+			"methodCalled", 
+			"durationInNS"
+	};
+	
+	ExponentialMovingAverageRate logRate = new ExponentialMovingAverageRate();
+	
+	boolean statDump = false;
+	
 	public GuidoTransformer() {
 		getExtraProps();
 		loadClassConfigurer();
@@ -74,11 +95,19 @@ public class GuidoTransformer implements ClassFileTransformer {
 		buildAddons();
 		createLogger();
 		createDefaults();
+		setPid();
+		createStatsObject();
 		getQListenersCount();
 		startQListeners();
-		setPid();
 	}
 	
+	private void createStatsObject() {
+		statDump = PropsUtil.getPropOrEnv("guido.__trace") != null;
+		if(statDump) {
+			GuidoLogger.info("@@@ stats are activated - they will be generated every 30s");
+		}
+	}
+
 	private void getQListenersCount() {
 		logQListeners = Integer.valueOf(PropsUtil.getPropOrEnv("guido.logqlisteners", "3"));
 	}
@@ -192,12 +221,34 @@ public class GuidoTransformer implements ClassFileTransformer {
 
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private void createLogger() {
+		LoggerContext loggerContext = new LoggerContext();
+		
+		LOG = loggerContext.getLogger("json_tcp");
+		LOG.setLevel(Level.INFO);
+		
+		Appender globalAppender = null;
+		if(getPropOrEnv("guido.showLogsOnConsole") != null) {
+			globalAppender = createConsoleAppender(loggerContext);
+		} else {
+			globalAppender = createLogmaticAppender(loggerContext);
+		}
+		LOG.addAppender(globalAppender);
+		
+		for(Entry<String, String> prop : extraProps.entrySet()) {
+			MDC.put(prop.getKey(), prop.getValue());
+		}
+		
+		LOG.setAdditive(false);
+		loggerContext.start();
+	}
+	
+	@SuppressWarnings("rawtypes")
+	private Appender createLogmaticAppender(LoggerContext loggerContext) {
 		String logmaticKey = getPropOrEnv("guido.logmaticKey");
 		if(logmaticKey == null) {
 			throw new RuntimeException("guido.logmaticKey is missing - set it as -Dguido.logmaticKey=x or in a guido.logmaticKey env property");
 		}
 		String destination = getPropOrEnv("guido.destination", "api.logmatic.io:10514");
-		LoggerContext loggerContext = new LoggerContext();
 		
 		GuidoLogstashEncoder encoder = new GuidoLogstashEncoder();
 		encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
@@ -212,29 +263,25 @@ public class GuidoTransformer implements ClassFileTransformer {
 		tcpSocketAppender.setEncoder(encoder);
 		tcpSocketAppender.setContext(loggerContext);
 		tcpSocketAppender.start();
+		return tcpSocketAppender;
 
-		LOG = loggerContext.getLogger("json_tcp");
-		LOG.setLevel(Level.INFO);
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private Appender createConsoleAppender(LoggerContext loggerContext) {
+		LoggingEventAsyncDisruptorAppender disruptorAppender = new LoggingEventAsyncDisruptorAppender();
+		disruptorAppender.setContext(loggerContext);
 		
-		if(getPropOrEnv("guido.showLogsOnConsole") != null) {
-			ConsoleAppender consoleAppender = new ConsoleAppender();
-			GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
-			encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
-			consoleEncoder.start();
-			consoleAppender.setEncoder(consoleEncoder);
-			consoleAppender.setContext(loggerContext);
-			consoleAppender.start();
-			LOG.addAppender(consoleAppender);
-		} else {
-			LOG.addAppender(tcpSocketAppender);
-		}
-		
-		for(Entry<String, String> prop : extraProps.entrySet()) {
-			MDC.put(prop.getKey(), prop.getValue());
-		}
-		
-		LOG.setAdditive(false);
-		loggerContext.start();
+		ConsoleAppender consoleAppender = new ConsoleAppender();
+		GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
+		consoleEncoder.setMessageProvider(new GuidoJsonJsonMessageProvider(jsonFieldNames));
+		consoleEncoder.start();
+		consoleAppender.setEncoder(consoleEncoder);
+		consoleAppender.setContext(loggerContext);
+		consoleAppender.start();
+		disruptorAppender.addAppender(consoleAppender);
+		disruptorAppender.start();
+		return disruptorAppender;
 	}
 
 	private void createDefaults() {
@@ -261,6 +308,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		ref[REF_CLASS_NAME] = method.getDeclaringClass().getSimpleName();
 		ref[REF_SHORT_SIGNATURE] = method.getDeclaringClass().getName() + "." + method.getName();
 		ref[REF_THRESHOLD] = threshold;
+		ref[REF_COUNT] = (long)0;
 		return ref;
 	}
 	
@@ -271,13 +319,36 @@ public class GuidoTransformer implements ClassFileTransformer {
 				public void run() {
 					for(;;) {
 						try {
-							String message = queue.take();
-							LOG.info(message);
+							Object[] logContents = queue.take();
+							LOG.info("{} - pid={} threadUuid={} depth={} methodCalled={} durationInNS={}", logContents);
+							if(statDump) {
+								logRate.increment();
+							}
 						} catch(InterruptedException ie) {
-							error("ie exception in loop take()", ie);
+							error("ie exception in loop take()");
 							return;
 						} catch(Exception e) {
 							error("exception in loop take()", e);
+						}
+					}
+				}
+			}).start();
+		}
+		if(statDump) {
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					GuidoLogger.info("stats dump thread started");
+					for(;;) {
+						try {
+							Thread.sleep(30 * 1000);
+							GuidoLogger.info(logRate.toString());
+						} catch(InterruptedException ie) {
+							error("ie exception in loop take()");
+							return;
+						} catch(Exception e) {
+							error("exception in thred stat dump", e);
+							return;
 						}
 					}
 				}
@@ -453,12 +524,14 @@ public class GuidoTransformer implements ClassFileTransformer {
 			"sun/", 
 			"com/sun/", 
 			"org/guido/", 
+			"oss/guido/",
 			//"org/springframework/",
 			"java.", 
 			"javax.", 
 			"sun.", 
 			"com.sun.", 
-			"org.guido.", 
+			"org.guido.",
+			"oss.guido."
 			//"org.springframework."
 			};
 	

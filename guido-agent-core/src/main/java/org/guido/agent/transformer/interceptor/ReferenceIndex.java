@@ -5,5 +5,7 @@ public interface ReferenceIndex {
 	static final int REF_THRESHOLD = 1;
 	static final int REF_CLASS_NAME = 2;
 	static final int REF_SHORT_SIGNATURE = 3;
-	static final int TOTAL_REF = 4;
+	static final int REF_COUNT = 4;
+	
+	static final int TOTAL_REF = 5;
 }

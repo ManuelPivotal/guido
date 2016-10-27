@@ -2,6 +2,7 @@ apply plugin: 'java'
 apply plugin: 'eclipse'
 
 jar {
+	archiveName = "guido-agent-oss-${version}.jar"
     manifest {
         attributes 'Implementation-Title': 'Gradle Quickstart', 'Implementation-Version': version
     }

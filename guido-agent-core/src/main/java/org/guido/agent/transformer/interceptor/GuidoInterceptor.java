@@ -17,7 +17,7 @@ import oss.guido.javassist.CtMethod;
 public class GuidoInterceptor {
 	
 	static public List<Object[]> references;
-	static public Deque<String> queue;
+	static public Deque<Object[]> queue;
 	public static String pid;
 	public static long threshold = 500000; // (0.5 ms)
 	static public Map<String, String> extraProps;
@@ -80,7 +80,7 @@ public class GuidoInterceptor {
 			initTLSElements();
 		}
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
-			localRefStack.get()[positionInStack.get().addAndGet()].start(references.get(index));
+			localRefStack.get()[positionInStack.get().addAndGet()].start(references.get(index), index);
 		}
 	}
 	
@@ -92,14 +92,27 @@ public class GuidoInterceptor {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
 			if(passes(stackElement.deltaTime, stackElement.reference)) {
-				StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference);
+				Object[] objects = buildObjectCommon(stackElement.deltaTime, stackElement.reference);
+				//(long)stackElement.reference[ReferenceIndex.REF_COUNT] += 1;
+				//StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference);
 				totalsent++;
-				boolean offered = queue.offer(sb.toString());
+				boolean offered = queue.offer(objects);
 				if(!offered) {
 					totalerror++;
 				}
 			}
 		}
+	}
+	
+	static private Object[] buildObjectCommon(long deltaTime, Object[] reference) {
+		Object[] objects = new Object[7];
+		objects[0] = reference[REF_CLASS_NAME];
+		objects[1] = pid;
+		objects[2] = threadUuid.get();
+		objects[3] = positionInStack.get().get() + 1;
+		objects[4] = reference[REF_SHORT_SIGNATURE];
+		objects[5] = deltaTime;
+		return objects;
 	}
 	
 	static private StringBuffer buildCommon(long deltaTime, Object[] reference) {
@@ -116,11 +129,12 @@ public class GuidoInterceptor {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
 			if(passes(stackElement.deltaTime, stackElement.reference)) {
-				StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference)
-						.append(" exception=").append(t.getClass().getName())
-				;
+//				StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference)
+//						.append(" exception=").append(t.getClass().getName())
+//				;
+				Object[] objects = buildObjectCommon(stackElement.deltaTime, stackElement.reference);
 				totalsent++;
-				boolean offered = queue.offer(sb.toString());
+				boolean offered = queue.offer(objects);
 				if(!offered) {
 					totalerror++;
 				}

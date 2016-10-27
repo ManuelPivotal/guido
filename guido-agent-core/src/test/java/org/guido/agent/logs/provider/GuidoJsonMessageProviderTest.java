@@ -84,4 +84,38 @@ public class GuidoJsonMessageProviderTest {
 		Assert.assertFalse("".equals(output));
 		Assert.assertTrue(output.contains(expected));
 	}
+	
+	@Test
+	public void canOutputJson() {
+		LoggerContext loggerContext = new LoggerContext();		
+		
+		IntercepterConsoleAppender consoleAppender = new IntercepterConsoleAppender();
+		GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
+		String[] fieldNames = new String[] {
+				"helloKey"
+		};
+		consoleEncoder.setMessageProvider(new GuidoJsonJsonMessageProvider(fieldNames));
+		consoleEncoder.start();
+		
+		consoleAppender.setEncoder(consoleEncoder);
+		consoleAppender.setContext(loggerContext);
+		consoleAppender.start();
+		
+		Logger LOG = loggerContext.getLogger("json_tcp");
+		LOG.setLevel(Level.INFO);
+		LOG.setAdditive(false);
+		LOG.addAppender(consoleAppender);
+		loggerContext.start();
+
+		LOG.info("{}", new Object[]{"hello"});
+		
+		String output = consoleAppender.getOutput();
+		System.out.println("output=" + output);
+		
+		long timeStamp = consoleAppender.timeStamp;
+		String expected = String.format("\"message\":{\"helloKey\":\"hello\"}", timeStamp);
+		
+		Assert.assertFalse("".equals(output));
+		Assert.assertTrue(output.contains(expected));
+	}
 }
