@@ -1,7 +1,6 @@
 package org.guido.agent.transformer.interceptor;
 
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_ALLOWED;
-import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_CLASS_NAME;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_SIGNATURE;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
 
@@ -22,7 +21,7 @@ public class GuidoInterceptor {
 	public static long threshold = 500000; // (0.5 ms)
 	static public Map<String, String> extraProps;
 	
-	public static final int MAX_STACK_DEPTH = 2047;
+	public static final int MAX_STACK_DEPTH = 128;
 	
 	static long totalsent = 0;
 	static long totalerror = 0;
@@ -76,25 +75,22 @@ public class GuidoInterceptor {
 	static public void push(int index) {
 		InThreadStackElement[] stack = localRefStack.get();
 		if(stack == null) {
-			// GuidoLogger.debug("@@@ Created TLS in " + GuidoInterceptor.class.getClassLoader().toString());
 			initTLSElements();
 		}
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
-			localRefStack.get()[positionInStack.get().addAndGet()].start(references.get(index), index);
+			localRefStack.get()[positionInStack.get().addAndGet()].start(references.get(index));
 		}
 	}
 	
-	static private boolean passes(long deltaTime, Object[] reference) {
-		return deltaTime > (long)reference[REF_THRESHOLD] && (Boolean)reference[REF_ALLOWED];
+	static private boolean passes(InThreadStackElement stackElement) {
+		return stackElement.deltaTime > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
 	}
 	
 	static public void pop(Object[] args) {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
-			if(passes(stackElement.deltaTime, stackElement.reference)) {
-				Object[] objects = buildObjectCommon(stackElement.deltaTime, stackElement.reference);
-				//(long)stackElement.reference[ReferenceIndex.REF_COUNT] += 1;
-				//StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference);
+			if(passes(stackElement)) {
+				Object[] objects = buildObjectCommon(stackElement);
 				totalsent++;
 				boolean offered = queue.offer(objects);
 				if(!offered) {
@@ -104,35 +100,11 @@ public class GuidoInterceptor {
 		}
 	}
 	
-	static private Object[] buildObjectCommon(long deltaTime, Object[] reference) {
-		Object[] objects = new Object[7];
-		objects[0] = reference[REF_CLASS_NAME];
-		objects[1] = pid;
-		objects[2] = threadUuid.get();
-		objects[3] = positionInStack.get().get() + 1;
-		objects[4] = reference[REF_SHORT_SIGNATURE];
-		objects[5] = deltaTime;
-		return objects;
-	}
-	
-	static private StringBuffer buildCommon(long deltaTime, Object[] reference) {
-		return new StringBuffer(2048)
-				.append(reference[REF_CLASS_NAME])
-				.append(" - pid=").append(pid)
-				.append(" threadUuid=").append(threadUuid.get())
-				.append(" depth=").append(positionInStack.get().get() + 1)
-				.append(" methodCalled=").append(reference[REF_SHORT_SIGNATURE])
-				.append(" durationInNS=").append(deltaTime);
-	}
-
 	static public void popInError(Throwable t) {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
-			if(passes(stackElement.deltaTime, stackElement.reference)) {
-//				StringBuffer sb = buildCommon(stackElement.deltaTime, stackElement.reference)
-//						.append(" exception=").append(t.getClass().getName())
-//				;
-				Object[] objects = buildObjectCommon(stackElement.deltaTime, stackElement.reference);
+			if(passes(stackElement)) {
+				Object[] objects = buildObjectCommon(stackElement);
 				totalsent++;
 				boolean offered = queue.offer(objects);
 				if(!offered) {
@@ -140,6 +112,17 @@ public class GuidoInterceptor {
 				}
 			}
 		}
+	}
+	
+	static private Object[] buildObjectCommon(InThreadStackElement stackElement) {
+		Object[] objects = new Object[5];
+		int index = 0;
+		objects[index++] = pid;
+		objects[index++] = threadUuid.get();
+		objects[index++] = positionInStack.get().get() + 1;
+		objects[index++] = stackElement.reference[REF_SHORT_SIGNATURE];
+		objects[index++] = stackElement.deltaTime;
+		return objects;
 	}
 	
 	private static void initTLSElements() {

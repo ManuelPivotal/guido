@@ -43,6 +43,7 @@ public class GuidoJsonMessageProviderTest {
 	
 	@Test
 	public void canEncodeWithAddons() {
+		
 		LoggerContext loggerContext = new LoggerContext();
 		
 		MessageAddon[] addons = new MessageAddon[] {

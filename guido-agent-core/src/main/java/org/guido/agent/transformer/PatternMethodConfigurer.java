@@ -16,13 +16,15 @@ import oss.guido.javassist.CtMethod;
 
 public class PatternMethodConfigurer {
 	
+	GuidoLogger guidoLOG = GuidoLogger.getLogger("PatternMethodConfigurer");
+	
 	public interface Reload {
 		void doReload();
 	}
 	
 	boolean loadInError = false;
 	List<PatternMethodConfig> perClassConfigs = new ArrayList<PatternMethodConfig>();
-	List<PatternMethodConfig> tmpPerClassConfigs; // = new ArrayList<PerClassConfig>();
+	List<PatternMethodConfig> tmpPerClassConfigs;
 	
 	PatternMethodConfig notAllowedConfig = new PatternMethodConfig(null, -1, false);
 	PatternMethodConfig allowedConfig = new PatternMethodConfig(null, -1, true);
@@ -31,6 +33,21 @@ public class PatternMethodConfigurer {
 	boolean hasDynamicConfiguration;
 	long lastModified = 0;
 	
+	boolean defaultAllOff = true;
+	boolean showMethodRules = false;
+	
+	public void defaultIsOff() {
+		defaultAllOff = true;
+	}
+	
+	public void defaultIsOn() {
+		defaultAllOff = false;
+	}
+	
+	public void showMethodRules() {
+		showMethodRules = true;
+	}
+
 	/*
 	 classname=threshold:x,on,off
 	 classname is an ant like path with . as separator.
@@ -57,6 +74,7 @@ public class PatternMethodConfigurer {
 			perClassConfigs = tmpPerClassConfigs; 
 			lastModified = configFile.lastModified();
 		} catch(Exception e) {
+			guidoLOG.error("Error loading method configuration file [" + fileName + "}", e);
 			loadInError = true;
 		}
 	}
@@ -112,7 +130,7 @@ public class PatternMethodConfigurer {
 						long newLastModified = new File(configFile).lastModified();
 						if(newLastModified > lastModified) {
 							loadClassConfigFromFile(configFile);
-							GuidoLogger.debug("reloading file " + configFile);
+							guidoLOG.debug("reloading file " + configFile);
 							reload.doReload();
 						}
 					} catch(InterruptedException e) {
@@ -131,10 +149,11 @@ public class PatternMethodConfigurer {
 	}
 
 	public PatternMethodConfig configFor(CtMethod method) {
-		PatternMethodConfig config = configFor(method.getDeclaringClass(), method);
+		String rootMethod = method.getDeclaringClass().getName() +  "." + method.getName();
+		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod);
 		if(!config.allowed) {
 			//debug("not allowed at first, checking interfaces");
-			if(configForInterfaces(method.getDeclaringClass(), method)) {
+			if(configForInterfaces(method.getDeclaringClass(), method, rootMethod)) {
 				//debug("found in interfarces");
 				return new PatternMethodConfig(config.className, config.threshold, true);
 			} else {
@@ -144,7 +163,7 @@ public class PatternMethodConfigurer {
 		return config;
 	}
 	
-	private boolean configForInterfaces(CtClass clazz, CtMethod method) {
+	private boolean configForInterfaces(CtClass clazz, CtMethod method, String rootMethod) {
 		try {
 			CtClass[] interfaces = clazz.getInterfaces();
 			for(CtClass itf : interfaces) {
@@ -154,14 +173,13 @@ public class PatternMethodConfigurer {
 					for(CtMethod sub : methods) {
 						if(sub.equals(method)) {
 							//debug("methods are equals, checking rules for method in interface");
-							return configFor(itf, method).isAllowed();
+							return configFor(itf, method, rootMethod).isAllowed();
 						}
 					}
 				} catch(Exception e) {
-					//debug("no methods found");
 					continue;
 				}
-				if(configForInterfaces(itf, method) == true) {
+				if(configForInterfaces(itf, method, rootMethod) == true) {
 					return true;
 				}
 			}
@@ -170,20 +188,47 @@ public class PatternMethodConfigurer {
 			return false;
 		}
 	}
+	
+	boolean isDefaultOn() {
+		return !defaultAllOff;
+	}
+	boolean isDefaultOff() {
+		return defaultAllOff;
+	}
 
-	protected PatternMethodConfig configFor(CtClass clazz, CtMethod method) {
+	protected PatternMethodConfig configFor(CtClass clazz, CtMethod method, String rootMethod) {
 		String methodName = clazz.getName() +  "." + method.getName();
-		boolean notAllowed = false;
+		boolean foundOn = false;
+		boolean foundOff = false;
 		for(PatternMethodConfig config : perClassConfigs) {
 			if(pathMatcher.match(config.className, methodName)) {
-				//debug("match for " + config.className + ", path " + methodName);
-				if(!config.allowed) {
-					notAllowed = true;
+				if(config.isAllowed()) {
+					if(showMethodRules) {
+						if(rootMethod.equals(methodName)) {
+							guidoLOG.info("RULE: {} ON by rule {}", rootMethod, config.className);
+						} else {
+							guidoLOG.info("RULE: {} ON by interface method[{}] rule {}", rootMethod, methodName, config.className);
+						}
+					}
+					foundOn = true;
 				} else {
-					return config;
+					if(showMethodRules) {
+						if(rootMethod.equals(methodName)) {
+							guidoLOG.info("RULE: {} OFF by rule {}", rootMethod, config.className);
+						} else {
+							guidoLOG.info("RULE: {} OFF by interface method[{}] and rule {}", rootMethod, methodName, config.className);
+						}
+					}
+					foundOff = true;
 				}
 			}
 		}
-		return (notAllowed) ? notAllowedConfig : allowedConfig;
+		// default on : 1 off and 0 on is off, otherwise on
+		// default off : 1 on and 0 off is on, otherwise off
+		if(isDefaultOn()) { // default on : 1 off and no on we are off, otherwise on
+			return foundOff && !foundOn ? notAllowedConfig : allowedConfig;
+		} else { // default off : 
+			return foundOn && !foundOff ? allowedConfig : notAllowedConfig;
+		}
 	}
 }
