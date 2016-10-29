@@ -12,8 +12,30 @@ public class CanReadGithubConfiguration {
 	static GuidoLogger LOG = GuidoLogger.getLogger("test");
 	
 	static String url = "https://raw.githubusercontent.com/vfabric-pso-emea/pcf-broker-dashboard-skeleton/master/auth2"; 
+	class TestNotify implements ConfigurationNotify {
+		@Override
+		public void onError() {
+			LOG.info("Error");
+		}
+
+		@Override
+		public void onLoaded(BufferedReader reader) throws Exception {
+			String line;
+			while((line = reader.readLine()) != null) {
+				LOG.info("{}", line);
+			}
+		}
+	}
 	
-	@Test
+	//@Test
+	public void canSeeGithubChange() throws Exception {
+		GithubConfigurationWatcher watcher = new GithubConfigurationWatcher("https://api.github.com/repos/ManuelPivotal/guido/contents/guido-conf/guido.conf?ref=develop", 10);
+		watcher.configurationNotify(new TestNotify());
+		watcher.start();
+		Thread.sleep(Long.MAX_VALUE);
+	}
+	
+	//@Test
 	public void canReadNoAuthGithubConfiguration() throws Exception {
 		URL url = new URL("https://raw.githubusercontent.com/ManuelPivotal/guido/master/build.gradle");
 		BufferedReader gitFileReader = null;
@@ -36,7 +58,7 @@ public class CanReadGithubConfiguration {
 		}
 	}
 	
-	@Test
+	//@Test
 	public void canReadWithBasicAuthGithubConfiguration() throws Exception {
 		String httpUrl = "https://ManuelPivotal:Fauchelevent001@raw.githubusercontent.com/vfabric-pso-emea/pcf-broker-dashboard-skeleton/master/auth2";
 		//String httpUrl = "https://raw.githubusercontent.com/vfabric-pso-emea/pcf-broker-dashboard-skeleton/master/auth2";
@@ -66,7 +88,7 @@ public class CanReadGithubConfiguration {
 			LOG.info("{}", line);
 		}
 	}
-
+	
 	private int safeResponseCode(HttpURLConnection connection) {
 		try {
 			return connection.getResponseCode();

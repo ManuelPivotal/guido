@@ -14,6 +14,7 @@ import static org.guido.util.PropsUtil.getPropOrEnv;
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
 import java.security.ProtectionDomain;
+import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -30,6 +31,7 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.stats.ExponentialMovingAverageRate;
+import org.guido.agent.stats.Statistics;
 import org.guido.agent.transformer.configuration.FileConfigurationWatcher;
 import org.guido.agent.transformer.configuration.GithubConfigurationWatcher;
 import org.guido.agent.transformer.configuration.PatternMethodConfig;
@@ -37,6 +39,7 @@ import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
 import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.util.ExceptionUtil;
 import org.guido.util.PropsUtil;
 
 import oss.guido.ch.qos.logback.classic.Level;
@@ -348,7 +351,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 					for(;;) {
 						try {
 							Thread.sleep(30 * 1000);
-							guidoLOG.info(logRate.toString());
+							Statistics stats = logRate.getStatistics();
+							DecimalFormat df = new DecimalFormat("#.###"); 
+							guidoLOG.info("{[Sent={}, avg/s={}]}", stats.getCountLong(), df.format(stats.getMean()));
 							int total = 0;
 							int totalOn = 0;
 							int totalOff = 0;
@@ -435,6 +440,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 					return changed ? cclass.toBytecode() : null;
 				}
 			}
+			cclass.detach();
 		} catch(Exception e) {
 			guidoLOG.error("Error while transforming " + className, e);
 		}
@@ -489,7 +495,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 				Map<String, Object> params = buildConstructorArg();
 				interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
 			} catch(Exception e) {
-				guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
+				if(!(ExceptionUtil.getRootCause(e) instanceof LinkageError)) {
+					guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
+				}
 				return;
 			} catch(LinkageError le) {
 				// already in the class loader space

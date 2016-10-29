@@ -9,6 +9,7 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 	protected String configurationPath;
 	protected int secondsBetweenPolls;
 	protected ConfigurationNotify notify;
+	protected boolean needStop = false;
 	
 	public AbstractConfigurationWatcher(String configurationPath, int secondsBetweenPolls) {
 		configurationPath(configurationPath);
@@ -39,12 +40,19 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 		new Thread(this).start();
 	}
 	
+	public void stop() {
+		needStop = true;
+	}
+	
 	@Override
 	public void run() {
 		guidoLOG.debug("Starting file poller on {} every {} s", configurationPath, secondsBetweenPolls);
 		for(;;) {
 			try {
 				Thread.sleep(secondsBetweenPolls * 1000);
+				if(needStop) {
+					return;
+				}
 				doWatch();
 			} catch(InterruptedException ie) {
 				return;

@@ -1,6 +1,5 @@
 package org.guido.agent.transformer.configuration;
 
-import static org.mockito.Mockito.calls;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -200,12 +199,17 @@ public class PatternMethodConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.startConfigure();
 		configurer.addLine("**=off");
-		configurer.addLine("java.sql.Driver.*=on");
+		configurer.addLine("java.sql.Driver.*=on,threshold:10");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(true, methodConfig.isAllowed() == methods.contains(method));
+			if(methods.contains(method)) {
+				Assert.assertEquals((long)(10 * 1000000), methodConfig.getThreshold());
+			} else {
+				Assert.assertEquals((long)(-1), methodConfig.getThreshold());
+			}
 		}
 	}
 

@@ -107,18 +107,12 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		String rootMethod = method.getDeclaringClass().getName() +  "." + method.getName();
 		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod);
 		if(!config.allowed) {
-			//debug("not allowed at first, checking interfaces");
-			if(configForInterfaces(method.getDeclaringClass(), method, rootMethod)) {
-				//debug("found in interfarces");
-				return new PatternMethodConfig(config.className, config.threshold, true);
-			} else {
-				return notAllowedConfig;
-			}
+			return configForInterfaces(method.getDeclaringClass(), method, rootMethod);
 		}
 		return config;
 	}
 	
-	private boolean configForInterfaces(CtClass clazz, CtMethod method, String rootMethod) {
+	private PatternMethodConfig configForInterfaces(CtClass clazz, CtMethod method, String rootMethod) {
 		try {
 			CtClass[] interfaces = clazz.getInterfaces();
 			for(CtClass itf : interfaces) {
@@ -128,19 +122,20 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 					for(CtMethod sub : methods) {
 						if(sub.equals(method)) {
 							//debug("methods are equals, checking rules for method in interface");
-							return configFor(itf, method, rootMethod).isAllowed();
+							return configFor(itf, method, rootMethod);
 						}
 					}
 				} catch(Exception e) {
 					continue;
 				}
-				if(configForInterfaces(itf, method, rootMethod) == true) {
-					return true;
+				PatternMethodConfig itfConfig = configForInterfaces(itf, method, rootMethod);
+				if(itfConfig.isAllowed()) {
+					return itfConfig; 
 				}
 			}
-			return false;
+			return notAllowedConfig;
 		} catch(Exception e) {
-			return false;
+			return notAllowedConfig;
 		}
 	}
 	
@@ -155,6 +150,8 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		String methodName = clazz.getName() +  "." + method.getName();
 		boolean foundOn = false;
 		boolean foundOff = false;
+		PatternMethodConfig foundOnConfig = allowedConfig;
+		
 		for(PatternMethodConfig config : perClassConfigs) {
 			if(pathMatcher.match(config.className, methodName)) {
 				if(config.isAllowed()) {
@@ -166,6 +163,7 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 						}
 					}
 					foundOn = true;
+					foundOnConfig = config;
 				} else {
 					if(showMethodRules) {
 						if(rootMethod.equals(methodName)) {
@@ -181,9 +179,12 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		// default on : 1 off and 0 on is off, otherwise on
 		// default off : 1 on and 0 off is on, otherwise off
 		if(isDefaultOn()) { // default on : 1 off and no on we are off, otherwise on
-			return foundOff && !foundOn ? notAllowedConfig : allowedConfig;
+			if(foundOff && !foundOn) {
+				return notAllowedConfig;
+			}
+			return foundOn ? foundOnConfig : allowedConfig;
 		} else { // default off : 
-			return foundOn && !foundOff ? allowedConfig : notAllowedConfig;
+			return foundOn && !foundOff ? foundOnConfig : notAllowedConfig;
 		}
 	}
 

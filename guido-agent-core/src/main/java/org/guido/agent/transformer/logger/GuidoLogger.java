@@ -1,6 +1,10 @@
 package org.guido.agent.transformer.logger;
 
+import static org.guido.util.ExceptionUtil.getRootCause;
+
 import java.util.Date;
+
+import org.guido.util.ExceptionUtil;
 
 import oss.guido.org.slf4j.helpers.MessageFormatter;
 
@@ -50,9 +54,9 @@ public class GuidoLogger {
 	
 	private void dumpOut(String level, int intLevel, String message, Throwable exception) {
 		if(intLevel >= globalLevel) {
-			System.out.println(String.format("GuidoAgent[%s] - %d - %s - %s - %s",
+			System.out.println(String.format("GuidoAgent[%s] - [%s] - %s - %s - %s",
 					name,
-					Thread.currentThread().getId(),
+					Thread.currentThread().getName(),
 					new Date(), 
 					level, 
 					message));
@@ -63,17 +67,9 @@ public class GuidoLogger {
 				if(message != null) {
 					System.out.println(exceptionMessage);
 				}
-				//t.printStackTrace();
+				//exception.printStackTrace();
 			}
 			System.out.flush();
 		}
-	}
-
-	static Throwable getRootCause(Throwable throwable) {
-		Throwable cause;
-		while ((cause = throwable.getCause()) != null) {
-			throwable = cause;
-		}
-		return throwable;
 	}
 }

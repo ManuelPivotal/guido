@@ -1,6 +1,5 @@
 package org.guido.util;
 
-
 public class PropsUtil {
 	
 	public static String getPropOrEnv(String name, String defaultValue) {
