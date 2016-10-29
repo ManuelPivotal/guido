@@ -1,11 +1,13 @@
-package org.guido.agent.transformer;
+package org.guido.agent.transformer.configuration;
 
 import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.Assert;
 
-import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.agent.transformer.configuration.PatternMethodConfig;
+import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
+import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -20,6 +22,45 @@ public class PatternMethodConfigurerTest {
 	@BeforeClass
 	static public void init() {
 		pool = ClassPool.getDefault();;
+	}
+	
+	class FakeNotifier implements ConfigurationWatcher {
+		
+		ConfigurationNotify notify;
+
+		@Override
+		public void configurationPath(String path) {
+		}
+
+		@Override
+		public void configurationPolling(int second) {
+		}
+
+		@Override
+		public void configurationNotify(ConfigurationNotify notify) {
+			this.notify = notify;
+		}
+
+		@Override
+		public void start() {
+			notify.onError();
+		}
+	}
+	
+	@Test
+	public void noConfigIfConfigFileDoesNotExists() {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
+		configurer.startConfigure();
+		configurer.addLine("**=off");
+		configurer.endConfigure();
+		
+		Assert.assertEquals(1, configurer.getRules().size());
+		configurer.loadClassConfig(new FakeNotifier(), new Reload() {
+			@Override
+			public void doReload() {
+			}
+		});
+		Assert.assertEquals(0, configurer.getRules().size());
 	}
 	
 	@Test

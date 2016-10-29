@@ -1,10 +1,8 @@
-package org.guido.agent.transformer;
+package org.guido.agent.transformer.configuration;
 
 import static org.guido.util.PropsUtil.toNano;
 
 import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -14,7 +12,7 @@ import org.guido.util.AntPathMatcher;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 
-public class PatternMethodConfigurer {
+public class PatternMethodConfigurer implements ConfigurationNotify {
 	
 	GuidoLogger guidoLOG = GuidoLogger.getLogger("PatternMethodConfigurer");
 	
@@ -29,9 +27,9 @@ public class PatternMethodConfigurer {
 	PatternMethodConfig notAllowedConfig = new PatternMethodConfig(null, -1, false);
 	PatternMethodConfig allowedConfig = new PatternMethodConfig(null, -1, true);
 	
+	private Reload reload;
+	
 	AntPathMatcher pathMatcher = new AntPathMatcher();
-	boolean hasDynamicConfiguration;
-	long lastModified = 0;
 	
 	boolean defaultAllOff = true;
 	boolean showMethodRules = false;
@@ -47,7 +45,10 @@ public class PatternMethodConfigurer {
 	public void showMethodRules() {
 		showMethodRules = true;
 	}
-
+	
+	List<PatternMethodConfig> getRules() {
+		return perClassConfigs;
+	}
 	/*
 	 classname=threshold:x,on,off
 	 classname is an ant like path with . as separator.
@@ -58,25 +59,6 @@ public class PatternMethodConfigurer {
 	
 	public void startConfigure() {
 		tmpPerClassConfigs = new ArrayList<PatternMethodConfig>();
-	}
-	
-	void loadClassConfigFromFile(String fileName) {
-		loadInError = false;
-		File configFile = new File(fileName);
-		try(BufferedReader reader = new BufferedReader(new FileReader(fileName))) {
-			String line;
-			startConfigure();
-			while((line = reader.readLine()) != null) {
-				addLine(line);
-			}
-			// to minimize the time we modify perClassConfigs
-			endConfigure();
-			perClassConfigs = tmpPerClassConfigs; 
-			lastModified = configFile.lastModified();
-		} catch(Exception e) {
-			guidoLOG.error("Error loading method configuration file [" + fileName + "}", e);
-			loadInError = true;
-		}
 	}
 	
 	void addLine(String line) {
@@ -115,39 +97,12 @@ public class PatternMethodConfigurer {
 		return new PatternMethodConfig(className, threshold, allowed);
 	}
 
-	public void loadClassConfig(final String configFile, final Reload reload) {
-		if(configFile == null) {
-			return;
-		}
-		hasDynamicConfiguration = true;
-		loadClassConfigFromFile(configFile);
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				for(;;) {
-					try {
-						Thread.sleep(30 * 1000);
-						long newLastModified = new File(configFile).lastModified();
-						if(newLastModified > lastModified) {
-							loadClassConfigFromFile(configFile);
-							guidoLOG.debug("reloading file " + configFile);
-							reload.doReload();
-						}
-					} catch(InterruptedException e) {
-						return;
-					} catch(Exception ie) {
-						continue;
-					}
-				}
-			}
-			
-		}).start();
+	public void loadClassConfig(ConfigurationWatcher watcher, final Reload reload) {
+		this.reload = reload;
+		watcher.configurationNotify(this);
+		watcher.start();
 	}
 	
-	public boolean hasDynConfiguration() {
-		return hasDynamicConfiguration;
-	}
-
 	public PatternMethodConfig configFor(CtMethod method) {
 		String rootMethod = method.getDeclaringClass().getName() +  "." + method.getName();
 		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod);
@@ -230,5 +185,23 @@ public class PatternMethodConfigurer {
 		} else { // default off : 
 			return foundOn && !foundOff ? allowedConfig : notAllowedConfig;
 		}
+	}
+
+	@Override
+	public void onError() {
+		startConfigure();
+		endConfigure();
+		reload.doReload();
+	}
+
+	@Override
+	public void onLoaded(BufferedReader reader) throws Exception {
+		startConfigure();
+		String line;
+		while((line = reader.readLine()) != null) {
+			addLine(line);
+		}
+		endConfigure();
+		reload.doReload();
 	}
 }

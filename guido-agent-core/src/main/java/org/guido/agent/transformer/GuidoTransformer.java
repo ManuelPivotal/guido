@@ -30,7 +30,10 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.stats.ExponentialMovingAverageRate;
-import org.guido.agent.transformer.PatternMethodConfigurer.Reload;
+import org.guido.agent.transformer.configuration.FileConfigurationWatcher;
+import org.guido.agent.transformer.configuration.PatternMethodConfig;
+import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
+import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
@@ -159,8 +162,10 @@ public class GuidoTransformer implements ClassFileTransformer {
 		}
 		
 		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
+		String gitHubURL = PropsUtil.getPropOrEnv("guido.githuburl");
+		
 		if(configFile != null) {
-			classConfigurer.loadClassConfig(PropsUtil.getPropOrEnv("guido.classconfig"), new Reload() {
+			classConfigurer.loadClassConfig(new FileConfigurationWatcher(configFile, 30), new Reload() {
 				@Override
 				public void doReload() {
 					reloadAllReferences();
@@ -181,7 +186,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 			}
 		}
-		guidoLOG.info("Modifying method definitions - " + totalChanged + "/" + methods.size() + " method(s) modified");
+		guidoLOG.info("Method definitions modified - " + totalChanged + "/" + methods.size() + " method(s) modified");
 	}
 
 	private boolean isReferenceDifferent(int index, PatternMethodConfig newConfig) {

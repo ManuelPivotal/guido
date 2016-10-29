@@ -39,16 +39,16 @@ public class GuidoLogger {
 		error(null, msg, objects);
 	}
 
-	public void error(Exception exception, String format, Object...objects) {
+	public void error(Throwable throwable, String format, Object...objects) {
 		String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
-		dumpOut(ERROR_LEVEL, ERROR, formattedMessage, exception);
+		dumpOut(ERROR_LEVEL, ERROR, formattedMessage, throwable);
 	}
 
 	private void dumpOut(String level, int intLevel, String message) {
 		dumpOut(level, intLevel, message, null);
 	}
 	
-	private void dumpOut(String level, int intLevel, String message, Exception exception) {
+	private void dumpOut(String level, int intLevel, String message, Throwable exception) {
 		if(intLevel >= globalLevel) {
 			System.out.println(String.format("GuidoAgent[%s] - %d - %s - %s - %s",
 					name,
@@ -57,7 +57,6 @@ public class GuidoLogger {
 					level, 
 					message));
 			if (exception != null) {
-				System.out.println(exception.getClass());
 				Throwable t = getRootCause(exception);
 				System.out.println(t.getClass());
 				String exceptionMessage = t.getMessage();

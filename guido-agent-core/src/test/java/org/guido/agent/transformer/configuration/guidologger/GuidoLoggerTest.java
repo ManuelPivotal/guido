@@ -1,4 +1,4 @@
-package org.guido.agent.transformer.guidologger;
+package org.guido.agent.transformer.configuration.guidologger;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.junit.Test;

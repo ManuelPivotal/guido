@@ -1,4 +1,4 @@
-package org.guido.agent.transformer;
+package org.guido.agent.transformer.configuration;
 
 public class PerMethodConfig {
 	boolean allowed;
