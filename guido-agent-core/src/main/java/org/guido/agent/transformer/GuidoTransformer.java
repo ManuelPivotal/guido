@@ -31,6 +31,7 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.stats.ExponentialMovingAverageRate;
 import org.guido.agent.transformer.configuration.FileConfigurationWatcher;
+import org.guido.agent.transformer.configuration.GithubConfigurationWatcher;
 import org.guido.agent.transformer.configuration.PatternMethodConfig;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
@@ -164,7 +165,14 @@ public class GuidoTransformer implements ClassFileTransformer {
 		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
 		String gitHubURL = PropsUtil.getPropOrEnv("guido.githuburl");
 		
-		if(configFile != null) {
+		if(gitHubURL != null) {
+			classConfigurer.loadClassConfig(new GithubConfigurationWatcher(gitHubURL, 30), new Reload() {
+				@Override
+				public void doReload() {
+					reloadAllReferences();
+				}
+			});
+		} else if(configFile != null) {
 			classConfigurer.loadClassConfig(new FileConfigurationWatcher(configFile, 30), new Reload() {
 				@Override
 				public void doReload() {

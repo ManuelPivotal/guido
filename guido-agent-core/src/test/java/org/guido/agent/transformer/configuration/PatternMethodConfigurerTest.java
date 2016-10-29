@@ -1,12 +1,16 @@
 package org.guido.agent.transformer.configuration;
 
+import static org.mockito.Mockito.calls;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+
+import java.io.BufferedReader;
+import java.io.StringReader;
 import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.Assert;
 
-import org.guido.agent.transformer.configuration.PatternMethodConfig;
-import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -24,43 +28,77 @@ public class PatternMethodConfigurerTest {
 		pool = ClassPool.getDefault();;
 	}
 	
-	class FakeNotifier implements ConfigurationWatcher {
+	class ChangeNotifier extends AbstractConfigurationWatcher {
 		
-		ConfigurationNotify notify;
-
-		@Override
-		public void configurationPath(String path) {
+		public ChangeNotifier(String configurationPath, int secondsBetweenPolls) {
+			super(configurationPath, secondsBetweenPolls);
 		}
 
 		@Override
-		public void configurationPolling(int second) {
+		public void start() {
+			BufferedReader reader = new BufferedReader(new StringReader("**=off"));
+			try {
+				notify.onLoaded(reader);
+			} catch(Exception e) {}
 		}
 
 		@Override
-		public void configurationNotify(ConfigurationNotify notify) {
-			this.notify = notify;
+		protected void doStart() {
+		}
+
+		@Override
+		protected void doWatch() {
+		}
+	}
+
+	
+	class ErrorNotifier extends AbstractConfigurationWatcher {
+		
+		public ErrorNotifier(String configurationPath, int secondsBetweenPolls) {
+			super(configurationPath, secondsBetweenPolls);
 		}
 
 		@Override
 		public void start() {
 			notify.onError();
 		}
+
+		@Override
+		protected void doStart() {
+		}
+
+		@Override
+		protected void doWatch() {
+		}
 	}
 	
 	@Test
-	public void noConfigIfConfigFileDoesNotExists() {
+	public void configSetIfConfigFileDoesExist() {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
+		
+		Assert.assertEquals(0, configurer.getRules().size());
+		
+		Reload reload = mock(Reload.class);
+		
+		configurer.loadClassConfig(new ChangeNotifier("", 0), reload);
+		Assert.assertEquals(1, configurer.getRules().size());
+		verify(reload).doReload();
+	}
+
+	
+	@Test
+	public void noConfigIfConfigFileDoesNotExist() {
 		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
 		configurer.startConfigure();
 		configurer.addLine("**=off");
 		configurer.endConfigure();
 		
 		Assert.assertEquals(1, configurer.getRules().size());
-		configurer.loadClassConfig(new FakeNotifier(), new Reload() {
-			@Override
-			public void doReload() {
-			}
-		});
+		Reload reload = mock(Reload.class);
+		
+		configurer.loadClassConfig(new ErrorNotifier("", 0), reload);
 		Assert.assertEquals(0, configurer.getRules().size());
+		verify(reload).doReload();
 	}
 	
 	@Test

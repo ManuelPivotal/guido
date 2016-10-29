@@ -1,6 +1,7 @@
 package org.guido.agent.transformer.configuration;
 
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Base64;
 
@@ -14,7 +15,7 @@ class URLAuth {
 	
 	private URLAuth() {}
 	
-	static public URLAuth createFrom(String httpUrl) throws Exception {
+	static public URLAuth createFrom(String httpUrl) throws MalformedURLException {
 		URL url = new URL(httpUrl);
 		String userInfo = url.getUserInfo();
 		URLAuth urlAuth = new URLAuth();
@@ -27,6 +28,14 @@ class URLAuth {
 		}
 		LOG.debug("url is {}", urlAuth.url);
 		return urlAuth;
+	}
+	
+	public HttpURLConnection openConnection() throws Exception {
+		HttpURLConnection connection = (HttpURLConnection) (new URL(url).openConnection());
+		connection.setRequestMethod("GET");
+		addAuth(connection);
+		connection.setUseCaches(false);
+		return connection;
 	}
 	
 	public void addAuth(HttpURLConnection connection) {

@@ -74,5 +74,4 @@ public class CanReadGithubConfiguration {
 			return -1;
 		}
 	}
-
 }
