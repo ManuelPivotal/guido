@@ -72,4 +72,8 @@ public class GuidoLogger {
 			System.out.flush();
 		}
 	}
+
+	public static GuidoLogger getLogger(Class<?> clazz) {
+		return getLogger(clazz.getSimpleName());
+	}
 }

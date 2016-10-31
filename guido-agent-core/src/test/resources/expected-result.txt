@@ -1,0 +1,43 @@
+# Files in this directory are used to configure guido on an per-environment basis
+# 
+# Files are named {env}.conf where env is the name of the environment for which the configuration is applied
+# 
+# As soon as files are commited the guido agent in the environment reads the changes from git and applies them
+#
+# The format is as follows
+#    {class-name-ant-path}=[threshold:v,switch-value
+#    where:
+#       class name - specifies the pattern for the classnames to be logged
+#       v - threshold below which no logging will take place.
+#           v is expressed in ms, can be a decimal (0.1, 0.5 or 10000),
+#           default threshold is 0.5 ms unless the default is specified using -Dguido.threshold=v as a startup parameter
+#       switch-value - turns logging for this class on or off
+#
+
+# The Ant style matching:
+#    ? matches one character
+#    * matches zero or more characters
+#    ** matches zero or more 'directories' in a path
+# 
+#    Some examples:
+#    
+#    com.vocado.t?st.jsp - matches com.vocado.test but also com.vocado.tast or com.vocado.txst
+#    com.vocado.* - matches all classes that are directly in the com.vocado package
+#    com.vocado.** - matches all classes that are in the com.vocado package or package that starts with com.vocado
+#    com.vocado.**.Test - matches all Test classes wherever they are defined as long as the package starts with com.vocado 
+
+# Examples
+# this will log everything
+# **=on,threshold:0
+
+# logs only vocado methods regardless of duration
+# **.vocado.**=on,threshold:0
+
+# logs only hazelcast methods where the duration is greater than the default threshold of 0.5ms
+# **.hazelcast.**=on
+
+# logs only tomcat methods
+# **.tomcat.**=on
+
+# logs all classes inheriting from java.sql interfaces, whatever is the time spent in the method
+# java.sql.**=threshold:0,on

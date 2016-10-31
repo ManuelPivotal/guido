@@ -68,7 +68,7 @@ public class ExponentialMovingAverageRate {
 
 
 	public ExponentialMovingAverageRate() {
-		this(ONE_SECOND_SECONDS, ONE_MINUTE_SECONDS, DEFAULT_MOVING_AVERAGE_WINDOW);
+		this(ONE_SECOND_SECONDS, ONE_MINUTE_SECONDS, DEFAULT_MOVING_AVERAGE_WINDOW, true);
 	}
 	/**
 	 * @param period the period to base the rate measurement (in seconds)

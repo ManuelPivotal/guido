@@ -18,4 +18,19 @@ public class PropsUtil {
 		double coef = Double.valueOf(thresholdProp);
 		return (long)(1000000.0 * coef);
 	}
+
+	public static boolean getPropOrEnvBoolean(String name, boolean defaultValue) {
+		String value = System.getProperty(name);
+		if(value == null) {
+			value = System.getenv(name);
+		}
+		if(value == null) {
+			return defaultValue;
+		}
+		return Boolean.parseBoolean(value);
+	}
+
+	public static boolean getPropOrEnvBoolean(String name) {
+		return getPropOrEnvBoolean(name, false);
+	}
 }

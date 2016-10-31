@@ -1,0 +1,136 @@
+{
+	"lines": [
+		{
+			"text": "# Files in this directory are used to configure guido on an per-environment basis"
+		},
+		{
+			"text": "# "
+		},
+		{
+			"text": "# Files are named {env}.conf where env is the name of the environment for which the configuration is applied"
+		},
+		{
+			"text": "# "
+		},
+		{
+			"text": "# As soon as files are commited the guido agent in the environment reads the changes from git and applies them"
+		},
+		{
+			"text": "#"
+		},
+		{
+			"text": "# The format is as follows"
+		},
+		{
+			"text": "#    {class-name-ant-path}=[threshold:v,switch-value"
+		},
+		{
+			"text": "#    where:"
+		},
+		{
+			"text": "#       class name - specifies the pattern for the classnames to be logged"
+		},
+		{
+			"text": "#       v - threshold below which no logging will take place."
+		},
+		{
+			"text": "#           v is expressed in ms, can be a decimal (0.1, 0.5 or 10000),"
+		},
+		{
+			"text": "#           default threshold is 0.5 ms unless the default is specified using -Dguido.threshold=v as a startup parameter"
+		},
+		{
+			"text": "#       switch-value - turns logging for this class on or off"
+		},
+		{
+			"text": "#"
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# The Ant style matching:"
+		},
+		{
+			"text": "#    ? matches one character"
+		},
+		{
+			"text": "#    * matches zero or more characters"
+		},
+		{
+			"text": "#    ** matches zero or more 'directories' in a path"
+		},
+		{
+			"text": "# "
+		},
+		{
+			"text": "#    Some examples:"
+		},
+		{
+			"text": "#    "
+		},
+		{
+			"text": "#    com.vocado.t?st.jsp - matches com.vocado.test but also com.vocado.tast or com.vocado.txst"
+		},
+		{
+			"text": "#    com.vocado.* - matches all classes that are directly in the com.vocado package"
+		},
+		{
+			"text": "#    com.vocado.** - matches all classes that are in the com.vocado package or package that starts with com.vocado"
+		},
+		{
+			"text": "#    com.vocado.**.Test - matches all Test classes wherever they are defined as long as the package starts with com.vocado "
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# Examples"
+		},
+		{
+			"text": "# this will log everything"
+		},
+		{
+			"text": "# **=on,threshold:0"
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# logs only vocado methods regardless of duration"
+		},
+		{
+			"text": "# **.vocado.**=on,threshold:0"
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# logs only hazelcast methods where the duration is greater than the default threshold of 0.5ms"
+		},
+		{
+			"text": "# **.hazelcast.**=on"
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# logs only tomcat methods"
+		},
+		{
+			"text": "# **.tomcat.**=on"
+		},
+		{
+			"text": ""
+		},
+		{
+			"text": "# logs all classes inheriting from java.sql interfaces, whatever is the time spent in the method"
+		},
+		{
+			"text": "# java.sql.**=threshold:0,on"
+		}
+	],
+	"start": 0,
+	"size": 43,
+	"isLastPage": true
+}

@@ -10,6 +10,7 @@ import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_S
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.TOTAL_REF;
 import static org.guido.util.PropsUtil.getPropOrEnv;
+import static org.guido.util.PropsUtil.getPropOrEnvBoolean;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
@@ -32,6 +33,7 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.stats.ExponentialMovingAverageRate;
 import org.guido.agent.stats.Statistics;
+import org.guido.agent.transformer.configuration.BitBucketStashConfigurationWatcher;
 import org.guido.agent.transformer.configuration.FileConfigurationWatcher;
 import org.guido.agent.transformer.configuration.GithubConfigurationWatcher;
 import org.guido.agent.transformer.configuration.PatternMethodConfig;
@@ -87,7 +89,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	
 	ExponentialMovingAverageRate logRate = new ExponentialMovingAverageRate();
 	
-	boolean traceFlag = false;
+	boolean statsFlag = false;
 	
 	public GuidoTransformer() {
 		getExtraProps();
@@ -103,8 +105,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 	
 	private void getTraceFlag() {
-		traceFlag = PropsUtil.getPropOrEnv("guido.__trace") != null;
-		if(traceFlag) {
+		statsFlag = getPropOrEnvBoolean("guido.showStats");
+		if(statsFlag) {
 			guidoLOG.info("@@@ stats are activated - they will be generated every 30s");
 		}
 	}
@@ -161,13 +163,22 @@ public class GuidoTransformer implements ClassFileTransformer {
 	private void createClassConfigurer() {
 		classConfigurer = new PatternMethodConfigurer();
 		classConfigurer.defaultIsOff();
-		if(traceFlag) {
+		if(getPropOrEnvBoolean("guido.showRules")) {
 			classConfigurer.showMethodRules();
 		}
 		
 		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
 		String gitHubURL = PropsUtil.getPropOrEnv("guido.githuburl");
+		String bitBucketURL = PropsUtil.getPropOrEnv("guido.bitbucketurl");
 		
+		if(bitBucketURL != null) {
+			classConfigurer.loadClassConfig(new BitBucketStashConfigurationWatcher(bitBucketURL, 30), new Reload() {
+				@Override
+				public void doReload() {
+					reloadAllReferences();
+				}
+			});
+		}
 		if(gitHubURL != null) {
 			classConfigurer.loadClassConfig(new GithubConfigurationWatcher(gitHubURL, 30), new Reload() {
 				@Override
@@ -225,7 +236,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		LOG.setLevel(Level.INFO);
 		
 		Appender globalAppender = null;
-		if(getPropOrEnv("guido.showLogsOnConsole") != null) {
+		if(getPropOrEnvBoolean("guido.showLogsOnConsole")) {
 			globalAppender = createConsoleAppender(loggerContext);
 		} else {
 			globalAppender = createLogmaticAppender(loggerContext);
@@ -249,7 +260,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 		String destination = getPropOrEnv("guido.destination", "api.logmatic.io:10514");
 		
 		GuidoLogstashEncoder encoder = new GuidoLogstashEncoder();
-		encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
+		if(getPropOrEnvBoolean("guido.useJson")) {
+			encoder.setMessageProvider(new GuidoJsonJsonMessageProvider(jsonFieldNames));
+		} else {
+			encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
+		}
 		String appName = getPropOrEnv("guido.appname", "default-app-name");
 		
 		encoder.setCustomFields(String.format("{\"logmaticKey\":\"%s\", \"appname\" : \"%s\"}", logmaticKey, appName));
@@ -323,7 +338,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 							Object[] logContents = queue.take();
 							logContents[4] = toMicroSec(logContents[4]);
 							LOG.info("pid={} threadUuid={} depth={} methodCalled={} duration={}", logContents);
-							if(traceFlag) {
+							if(statsFlag) {
 								logRate.increment();
 							}
 						} catch(InterruptedException ie) {
@@ -336,24 +351,23 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 
 				private Object toMicroSec(Object object) {
-					long nanoSec = (long)object;
-					Long d = nanoSec % 1000;
-					Long l = nanoSec / 1000;
-					return l.toString() + "." + d.toString();
+					Double duration = (double)(long)object;
+					return duration / 1000.00;
 				}
 			}).start();
 		}
-		if(traceFlag) {
+		if(statsFlag) {
 			new Thread(new Runnable() {
 				@Override
 				public void run() {
 					guidoLOG.info("stats dump thread started");
+					DecimalFormat df = new DecimalFormat("###,###.###"); 
+					//NumberFormat numberFormat = new NumberFormat("###,###");
 					for(;;) {
 						try {
 							Thread.sleep(30 * 1000);
 							Statistics stats = logRate.getStatistics();
-							DecimalFormat df = new DecimalFormat("#.###"); 
-							guidoLOG.info("{[Sent={}, avg/s={}]}", stats.getCountLong(), df.format(stats.getMean()));
+							guidoLOG.info("{[sent={} - avg(s)={}]}", df.format(stats.getCountLong()), df.format(stats.getMean()));
 							int total = 0;
 							int totalOn = 0;
 							int totalOff = 0;

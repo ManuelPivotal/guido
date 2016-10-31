@@ -95,7 +95,8 @@ public class GuidoJsonMessageProviderTest {
 		String[] fieldNames = new String[] {
 				"helloKey"
 		};
-		consoleEncoder.setMessageProvider(new GuidoJsonJsonMessageProvider(fieldNames));
+		GuidoJsonJsonMessageProvider provider = new GuidoJsonJsonMessageProvider(fieldNames);
+		consoleEncoder.setMessageProvider(provider);
 		consoleEncoder.start();
 		
 		consoleAppender.setEncoder(consoleEncoder);
@@ -114,7 +115,7 @@ public class GuidoJsonMessageProviderTest {
 		System.out.println("output=" + output);
 		
 		long timeStamp = consoleAppender.timeStamp;
-		String expected = String.format("\"message\":{\"helloKey\":\"hello\"}", timeStamp);
+		String expected = String.format("\"%s\":{\"helloKey\":\"hello\"}", provider.getFieldName(), timeStamp);
 		
 		Assert.assertFalse("".equals(output));
 		Assert.assertTrue(output.contains(expected));

@@ -10,6 +10,7 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 	protected int secondsBetweenPolls;
 	protected ConfigurationNotify notify;
 	protected boolean needStop = false;
+	private boolean alreadyOnError = false;
 	
 	public AbstractConfigurationWatcher(String configurationPath, int secondsBetweenPolls) {
 		configurationPath(configurationPath);
@@ -61,5 +62,16 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 				continue;
 			}
 		}
+	}
+
+	protected void notifyError() {
+		if(!alreadyOnError) {
+			notify.onError();
+			alreadyOnError = true;
+		}
+	}
+
+	protected void resetError() {
+		alreadyOnError = false;
 	}
 }

@@ -15,7 +15,6 @@ import org.guido.agent.transformer.logger.GuidoLogger;
 
 import oss.guido.com.fasterxml.jackson.core.JsonParser;
 import oss.guido.com.fasterxml.jackson.core.JsonProcessingException;
-import oss.guido.com.fasterxml.jackson.core.type.TypeReference;
 import oss.guido.com.fasterxml.jackson.databind.DeserializationContext;
 import oss.guido.com.fasterxml.jackson.databind.DeserializationFeature;
 import oss.guido.com.fasterxml.jackson.databind.JsonNode;
@@ -27,12 +26,11 @@ import oss.guido.com.fasterxml.jackson.databind.module.SimpleModule;
 public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 
 	static GuidoLogger LOG = GuidoLogger.getLogger("GithubConfigurationWatcher");
-	
+	URLAuth urlAuth;
+
 	private ObjectMapper mapper;
 	
 	private GithubMessage currentConfiguration;
-	private boolean alreadyOnError = false;
-	
 	@JsonDeserialize(using = ContentDeserialize.class)
 	public static class GithubMessage {
 		String content;
@@ -91,8 +89,6 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 		mapper.registerModule(module);
 	}
 	
-	URLAuth urlAuth;
-
 	@Override
 	protected void doStart() {
 		loadConfigurationFromGithub();
@@ -136,17 +132,6 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 	
 	private GithubMessage turnToJson(String configuration) throws Exception {
 		return mapper.readValue(configuration, GithubMessage.class);
-	}
-
-	private void notifyError() {
-		if(!alreadyOnError) {
-			notify.onError();
-			alreadyOnError = true;
-		}
-	}
-
-	private void resetError() {
-		alreadyOnError = false;
 	}
 
 	@Override

@@ -14,7 +14,7 @@ import oss.guido.javassist.CtMethod;
 
 public class PatternMethodConfigurer implements ConfigurationNotify {
 	
-	GuidoLogger guidoLOG = GuidoLogger.getLogger("PatternMethodConfigurer");
+	GuidoLogger LOG = GuidoLogger.getLogger("PatternMethodConfigurer");
 	
 	public interface Reload {
 		void doReload();
@@ -71,6 +71,9 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		}
 		PatternMethodConfig classConfig = parseLine(line);
 		if(classConfig != null) {
+			if(showMethodRules) {
+				LOG.info("Adding rule {}", line);
+			}
 			tmpPerClassConfigs.add(classConfig);
 		}
 	}
@@ -157,9 +160,9 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 				if(config.isAllowed()) {
 					if(showMethodRules) {
 						if(rootMethod.equals(methodName)) {
-							guidoLOG.info("RULE: {} ON by rule {}", rootMethod, config.className);
+							LOG.info("RULE: {} ON by rule {}", rootMethod, config.className);
 						} else {
-							guidoLOG.info("RULE: {} ON by interface method[{}] rule {}", rootMethod, methodName, config.className);
+							LOG.info("RULE: {} ON by interface method[{}] rule {}", rootMethod, methodName, config.className);
 						}
 					}
 					foundOn = true;
@@ -167,9 +170,9 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 				} else {
 					if(showMethodRules) {
 						if(rootMethod.equals(methodName)) {
-							guidoLOG.info("RULE: {} OFF by rule {}", rootMethod, config.className);
+							LOG.info("RULE: {} OFF by rule {}", rootMethod, config.className);
 						} else {
-							guidoLOG.info("RULE: {} OFF by interface method[{}] and rule {}", rootMethod, methodName, config.className);
+							LOG.info("RULE: {} OFF by interface method[{}] and rule {}", rootMethod, methodName, config.className);
 						}
 					}
 					foundOff = true;

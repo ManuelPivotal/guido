@@ -1,3 +1,3 @@
-gradle clean build jar fatJar
+gradle clean build jar fatJar -x test
 cp ./build/libs/guido-agent-1.0.*.jar /Users/manuelmeyer/Dropbox/shared/
 ls -alh /Users/manuelmeyer/Dropbox/shared/
