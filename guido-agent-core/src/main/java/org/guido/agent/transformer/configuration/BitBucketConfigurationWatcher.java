@@ -9,10 +9,7 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.util.Base64;
 
-import org.guido.agent.transformer.configuration.GithubConfigurationWatcher.ContentDeserialize;
-import org.guido.agent.transformer.configuration.GithubConfigurationWatcher.GithubMessage;
 import org.guido.agent.transformer.logger.GuidoLogger;
 
 import oss.guido.com.fasterxml.jackson.core.JsonParser;

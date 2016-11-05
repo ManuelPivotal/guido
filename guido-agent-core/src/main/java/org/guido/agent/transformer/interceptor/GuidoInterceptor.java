@@ -27,12 +27,10 @@ public class GuidoInterceptor {
 	static long totalerror = 0;
 	
 	public GuidoInterceptor() {
-		System.out.println("GuidoInterceptor empty created by " + getClass().getClassLoader());
 	}
 
 	@SuppressWarnings({ "unchecked", "rawtypes" })
 	public GuidoInterceptor(Object mapRef) {
-		System.out.println("GuidoInterceptor created by " + getClass().getClassLoader());
 		Map<String, Object> paramMap = (Map<String, Object>)mapRef;
 		GuidoInterceptor.references = (List<Object[]>)paramMap.get("refs");
 		GuidoInterceptor.queue = (Deque)paramMap.get("logQ");

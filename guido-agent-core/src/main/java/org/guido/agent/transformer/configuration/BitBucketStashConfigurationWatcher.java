@@ -4,7 +4,6 @@ import static java.net.HttpURLConnection.HTTP_NOT_MODIFIED;
 import static java.net.HttpURLConnection.HTTP_OK;
 
 import java.io.BufferedReader;
-import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
@@ -13,12 +12,8 @@ import java.util.List;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
 
-import oss.guido.com.fasterxml.jackson.core.JsonParser;
-import oss.guido.com.fasterxml.jackson.core.JsonProcessingException;
-import oss.guido.com.fasterxml.jackson.databind.DeserializationContext;
 import oss.guido.com.fasterxml.jackson.databind.DeserializationFeature;
 import oss.guido.com.fasterxml.jackson.databind.ObjectMapper;
-import oss.guido.com.fasterxml.jackson.databind.deser.std.StdDeserializer;
 
 public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWatcher {
 	
@@ -67,7 +62,7 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 	
 	private ObjectMapper mapper;
 	URLAuth urlAuth;
-
+	
 	public BitBucketStashConfigurationWatcher() {
 		this(null, 0);
 	}
@@ -78,7 +73,7 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 			try {
 				urlAuth = URLAuth.createFrom(configurationPath);
 			} catch(MalformedURLException mfe) {
-				LOG.error(mfe, "Invalid URL {}", configurationPath);
+				LOG.error(mfe, "Invalid bitbucket URL");
 				throw new RuntimeException(mfe);
 			}
 		}
@@ -90,7 +85,7 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 
 	@Override
 	protected void doStart() {
-		loadConfigurationFromBitBucket();
+		//loadConfigurationFromBitBucket();
 	}
 
 	private void loadConfigurationFromBitBucket() {
@@ -102,7 +97,7 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 					return;
 				}
 				if(connection.getResponseCode() != HTTP_OK) {
-					LOG.debug("github response code is {}", connection.getResponseCode());
+					LOG.debug("bitbucket response code is {}", connection.getResponseCode());
 					notifyError();
 				}
 				StringBuffer sb = new StringBuffer();
@@ -122,7 +117,8 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 				}
 			}
 		} catch(Throwable e) {
-			LOG.error(e, "Error while getting bitbucket stash {}", configurationPath);
+			LOG.info("Config not reacheable using stash {}", 
+						(urlAuth != null) ? urlAuth.displayableURL() : "");
 			notifyError();
 		}
 	}

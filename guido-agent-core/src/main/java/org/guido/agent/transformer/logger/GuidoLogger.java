@@ -4,22 +4,35 @@ import static org.guido.util.ExceptionUtil.getRootCause;
 
 import java.util.Date;
 
-import org.guido.util.ExceptionUtil;
-
 import oss.guido.org.slf4j.helpers.MessageFormatter;
 
 public class GuidoLogger {
-	static final int globalLevel = 0;
+	static int globalLogLevel = 2; // default is error
 	
-	static final int DEBUG = 0;
-	static final int INFO = 1;
-	static final int ERROR = 2;
+	static final public int DEBUG = 0;
+	static final public int INFO = 1;
+	static final public int ERROR = 2;
 
 	static final String DEBUG_LEVEL = "DEBUG";
 	static final String INFO_LEVEL = "INFO";
 	static final String ERROR_LEVEL = "ERROR";
-	
+
 	private String name;
+	
+	public static int setGlobalLogLevel(int level) {
+		int lastLevel = globalLogLevel;
+		globalLogLevel = level;
+		return lastLevel;
+	}
+
+	public static void setGlobalLogLevel(String level) {
+		if(level != null) {
+			level = level.toUpperCase();
+			if(DEBUG_LEVEL.equals(level)) {globalLogLevel = DEBUG;}
+			if(INFO_LEVEL.equals(level)) {globalLogLevel = INFO;}
+			if(ERROR_LEVEL.equals(level)) {globalLogLevel = ERROR;}
+		}
+	}
 	
 	protected GuidoLogger(String name) {
 		this.name = name;
@@ -36,7 +49,7 @@ public class GuidoLogger {
 
 	public void info(String format, Object...objects) {
 	   String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
-	   dumpOut(DEBUG_LEVEL, DEBUG, formattedMessage);
+	   dumpOut(INFO_LEVEL, INFO, formattedMessage);
 	}
 
 	public void error(String msg, Object...objects) {
@@ -53,7 +66,7 @@ public class GuidoLogger {
 	}
 	
 	private void dumpOut(String level, int intLevel, String message, Throwable exception) {
-		if(intLevel >= globalLevel) {
+		if(intLevel >= globalLogLevel) {
 			System.out.println(String.format("GuidoAgent[%s] - [%s] - %s - %s - %s",
 					name,
 					Thread.currentThread().getName(),
@@ -62,12 +75,13 @@ public class GuidoLogger {
 					message));
 			if (exception != null) {
 				Throwable t = getRootCause(exception);
-				System.out.println(t.getClass());
+				String errorMessage = t.getClass().getSimpleName();
 				String exceptionMessage = t.getMessage();
-				if(message != null) {
-					System.out.println(exceptionMessage);
+				if(exceptionMessage != null) {
+					errorMessage += " " + exceptionMessage;
 				}
-				//exception.printStackTrace();
+				System.out.println(errorMessage);
+				exception.printStackTrace();
 			}
 			System.out.flush();
 		}

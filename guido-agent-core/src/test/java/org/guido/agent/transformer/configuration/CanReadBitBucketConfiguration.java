@@ -1,5 +1,7 @@
 package org.guido.agent.transformer.configuration;
 
+import java.net.URL;
+
 import junit.framework.Assert;
 
 import org.guido.agent.transformer.configuration.BitBucketStashConfigurationWatcher.BitBucketStashMessage;
@@ -26,5 +28,20 @@ public class CanReadBitBucketConfiguration {
 		BitBucketStashMessage message = watcher.turnToJson(data);
 		String expected = TestUtils.loadTestFileData("expected-result.txt");
 		Assert.assertEquals(expected, message.content());
+	}
+	
+	@Test
+	public void canExtractUserInfos() throws Exception {
+		String httpUrl = "https://manuel@meyer.com:guidoa@ccount@api.bitbucket.org/1.0/repositories/test.conf";
+		int lastAt = httpUrl.lastIndexOf('@');
+		if(lastAt != -1) {
+			int urlStartIndex = httpUrl.indexOf("://");
+			String credentials = httpUrl.substring(urlStartIndex + 3, lastAt);
+			String nonCredentials = httpUrl.replace(credentials + "@", "");
+			LOG.info("Credentials [{}] non credentials [{}]", credentials, nonCredentials);
+			httpUrl = nonCredentials;
+		}
+		URL url = new URL(httpUrl);
+		LOG.debug("URL is {}, userInfo is {}", url.toString(), url.getUserInfo());
 	}
 }

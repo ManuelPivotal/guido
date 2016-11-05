@@ -7,7 +7,9 @@ import org.guido.agent.transformer.logger.GuidoLogger;
 
 public class AgentMain {
 	  public static void premain(String args, Instrumentation instrumentation) {
-		  GuidoLogger.getLogger("main").debug("Guido {} agent loaded ...", AgentMain.class.getPackage().getImplementationVersion());
+		  GuidoLogger.getLogger("main").info("Guido {} agent loaded ...", 
+				  		AgentMain.class.getPackage().getImplementationVersion(),
+				  		args);
 		  GuidoTransformer transformer = new GuidoTransformer();
 		  instrumentation.addTransformer(transformer);
 	  }

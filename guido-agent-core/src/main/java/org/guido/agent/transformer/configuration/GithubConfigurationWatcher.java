@@ -21,6 +21,7 @@ import oss.guido.com.fasterxml.jackson.databind.JsonNode;
 import oss.guido.com.fasterxml.jackson.databind.ObjectMapper;
 import oss.guido.com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import oss.guido.com.fasterxml.jackson.databind.deser.std.StdDeserializer;
+import oss.guido.com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import oss.guido.com.fasterxml.jackson.databind.module.SimpleModule;
 
 public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
@@ -63,10 +64,18 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 		@Override
 		public GithubMessage deserialize(JsonParser jp, DeserializationContext ctxt) throws IOException, JsonProcessingException {
 			JsonNode node = jp.getCodec().readTree(jp);
-			String content = node.get("content").asText().replaceAll("\\n",  "");
+			JsonNode dataNode = node.get("content");
+			if(dataNode == null) {
+				throw new RuntimeException("no content field in response - invalid Githib reponse");
+			}
+			String content = dataNode.asText().replaceAll("\\n",  "");
 			GithubMessage message = new GithubMessage();
 			message.content = content;
-			message.sha = node.get("sha").asText();
+			dataNode = node.get("sha");
+			if(dataNode == null) {
+				throw new RuntimeException("no sha field in response - invalid Githib reponse");
+			}
+			message.sha = dataNode.asText();
 			return message;
 		}
 	}
@@ -76,7 +85,7 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 		try {
 			urlAuth = URLAuth.createFrom(configurationPath);
 		} catch(MalformedURLException mfe) {
-			LOG.error(mfe, "Invalid URL {}", configurationPath);
+			LOG.error(mfe, "Invalid URL", configurationPath);
 			throw new RuntimeException(mfe);
 		}
 		currentConfiguration = new GithubMessage();
@@ -91,7 +100,7 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 	
 	@Override
 	protected void doStart() {
-		loadConfigurationFromGithub();
+		//loadConfigurationFromGithub();
 	}
 
 	private void loadConfigurationFromGithub() {
@@ -125,7 +134,8 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 				}
 			}
 		} catch(Throwable e) {
-			LOG.error(e, "Error while getting github {}", configurationPath);
+			LOG.error(e, "Error while getting bitbucket stash {}", 
+						(urlAuth != null) ? urlAuth.displayableURL() : "");
 			notifyError();
 		}
 	}

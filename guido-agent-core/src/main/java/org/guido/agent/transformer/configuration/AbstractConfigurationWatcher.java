@@ -34,10 +34,23 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 	
 	protected abstract void doStart();
 	protected abstract void doWatch();
+	protected void doTerminate() {}
 
 	@Override
 	public void start() {
-		doStart();
+		//doStart();
+		new Thread(new Runnable(){
+			@Override
+			public void run() {
+				try {
+					for(;;) {
+						Thread.sleep(Long.MAX_VALUE);
+					}
+				} catch(InterruptedException ie) {
+					doTerminate();
+				}
+			}
+		}).start();
 		new Thread(this).start();
 	}
 	
@@ -50,11 +63,14 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 		guidoLOG.debug("Starting file poller on {} every {} s", configurationPath, secondsBetweenPolls);
 		for(;;) {
 			try {
+				doWatch();
+				if(needStop) {
+					return;
+				}
 				Thread.sleep(secondsBetweenPolls * 1000);
 				if(needStop) {
 					return;
 				}
-				doWatch();
 			} catch(InterruptedException ie) {
 				return;
 			} catch(Exception e) {

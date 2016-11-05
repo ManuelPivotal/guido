@@ -32,6 +32,7 @@ import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
 import org.guido.agent.logs.provider.GuidoLogstashEncoder;
 import org.guido.agent.stats.ExponentialMovingAverageRate;
+import org.guido.agent.stats.MemoryUsageStats;
 import org.guido.agent.stats.Statistics;
 import org.guido.agent.transformer.configuration.BitBucketStashConfigurationWatcher;
 import org.guido.agent.transformer.configuration.FileConfigurationWatcher;
@@ -65,7 +66,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	private Logger LOG;
 	private GuidoLogger guidoLOG = GuidoLogger.getLogger("GuidoTransformer");
 	
-	List<Class<?>> addedClassLoader = new ArrayList<Class<?>>();
+	List<String> addedClassLoader = new ArrayList<String>();
 	ClassPool pool;
 	LinkedBlockingDeque<Object[]> queue = new LinkedBlockingDeque<Object[]>();
 	List<Object[]> references = new ArrayList<Object[]>(32 * 1024);
@@ -78,6 +79,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	int propExLength = propEx.length();
 	MessageAddon[] addons = new MessageAddon[0];
 	int logQListeners = 1;
+	String pid;
 	
 	String[] jsonFieldNames = new String[] {
 			"pid", 
@@ -92,6 +94,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	boolean statsFlag = false;
 	
 	public GuidoTransformer() {
+		setGlobalLogLevel();
 		getExtraProps();
 		getTraceFlag();
 		createClassConfigurer();
@@ -102,8 +105,22 @@ public class GuidoTransformer implements ClassFileTransformer {
 		setPid();
 		getQListenersCount();
 		startQListeners();
+		startMemoryStats();
 	}
 	
+	private void setGlobalLogLevel() {
+		GuidoLogger.setGlobalLogLevel(getPropOrEnv("guido.logLevel", "error"));
+	}
+
+	private void startMemoryStats() {
+		if(getPropOrEnvBoolean("guido.memStats")) {
+			MemoryUsageStats memStats = new MemoryUsageStats();
+			int delay = PropsUtil.getPropOrEnvInt("guido.memStatsFrequency", 20000); // every 20s by default
+			memStats.init(pid, LOG, delay);
+			memStats.start();
+		}
+	}
+
 	private void getTraceFlag() {
 		statsFlag = getPropOrEnvBoolean("guido.showStats");
 		if(statsFlag) {
@@ -224,7 +241,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 
 	private void setPid() {
-		String pid = UUID.randomUUID().toString();
+		pid = UUID.randomUUID().toString();
 		GuidoInterceptor.pid = pid;
 	}
 
@@ -407,7 +424,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 				return null;
 			}
 			
-			boolean allowdebug = false;
 			addLoaderToPool(loader, protectionDomain);
 			
 			if(className == null) {
@@ -427,8 +443,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 			try {
 				cclass = pool.get(className.replaceAll("/", "."));
 			} catch(Exception e) {
-				if(allowdebug)
-					guidoLOG.error(className + " not in pool", e);
+				//guidoLOG.error(e, "{} not in pool", className);
 				return null;
 			}
 			
@@ -447,7 +462,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 								method.addCatch(addCatch(), etype);
 								changed = true;
 							} catch(Exception e) {
-								guidoLOG.error("Error while transforming " + method.getLongName(), e);
+								guidoLOG.info("Cannot transform {} - probably missing dependencies", method.getLongName());
 							}
 						}
 					}
@@ -456,7 +471,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 			}
 			cclass.detach();
 		} catch(Exception e) {
-			guidoLOG.error("Error while transforming " + className, e);
+			guidoLOG.error(e, "Error while transforming {}", e);
 		}
 		return null;
 	}
@@ -476,12 +491,17 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 
 	private void addLoaderToPool(ClassLoader loader, ProtectionDomain protectionDomain) {
-		if(!addedClassLoader.contains(loader.getClass())) {
-			guidoLOG.debug("@@@@ adding class loader of class " + loader.getClass().getCanonicalName());
-			guidoLOG.debug("@@@@ loader instance of ClassLoader is " + (loader instanceof ClassLoader));
-			addedClassLoader.add(loader.getClass());
-			pool.appendClassPath(new LoaderClassPath(loader));
-			forceGuidoClassesToLoader(loader, protectionDomain);
+		String loaderClass = loader.getClass().getCanonicalName();
+		if(!loaderClass.contains("DelegatingClassLoader")) {
+			String signature = String.valueOf(loader.hashCode());
+			if(!addedClassLoader.contains(signature)) {
+				guidoLOG.debug("Adding new class loader of {} signature [{}]", loaderClass, signature);
+				guidoLOG.debug("@@@@ adding class loader of class " + loader.getClass().getCanonicalName());
+				guidoLOG.debug("@@@@ loader instance of ClassLoader is " + (loader instanceof ClassLoader));
+				addedClassLoader.add(signature);
+				pool.insertClassPath(new LoaderClassPath(loader));
+				forceGuidoClassesToLoader(loader, protectionDomain);
+			}
 		}
 	}
 
@@ -496,28 +516,25 @@ public class GuidoTransformer implements ClassFileTransformer {
 		} catch(Throwable e) {
 			guidoLOG.debug("@@@@ " + binaryName + " does not exist in " + loaderClass);
 		}
-		
-		if(!loaderClass.contains("DelegatingClassLoader")) {
-			guidoLOG.debug("@@@@ forcing load of Guido classes by {}", loaderClass);
-			try {
-				for(Class<?> clazz : GuidoInterceptor.toLoad) {
-					CtClass guidoClass = pool.get(clazz.getCanonicalName());
-					guidoClass.toClass(loader, protectionDomain);
-				}
-				CtClass interceptorCtClass = pool.get(GuidoInterceptor.class.getCanonicalName());
-				Class<?> interceptorClass = interceptorCtClass.toClass(loader, protectionDomain);
-				Map<String, Object> params = buildConstructorArg();
-				interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
-			} catch(Exception e) {
-				if(!(ExceptionUtil.getRootCause(e) instanceof LinkageError)) {
-					guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
-				}
-				return;
-			} catch(LinkageError le) {
-				// already in the class loader space
+		guidoLOG.debug("@@@@ forcing load of Guido classes by {}", loaderClass);
+		try {
+			for(Class<?> clazz : GuidoInterceptor.toLoad) {
+				CtClass guidoClass = pool.get(clazz.getCanonicalName());
+				guidoClass.toClass(loader, protectionDomain);
 			}
-			guidoLOG.debug("@@@@ forcing load of Guido classes done.");
+			CtClass interceptorCtClass = pool.get(GuidoInterceptor.class.getCanonicalName());
+			Class<?> interceptorClass = interceptorCtClass.toClass(loader, protectionDomain);
+			Map<String, Object> params = buildConstructorArg();
+			interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
+		} catch(Exception e) {
+			if(!(ExceptionUtil.getRootCause(e) instanceof LinkageError)) {
+				guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
+			}
+			return;
+		} catch(LinkageError le) {
+			// already in the class loader space
 		}
+		guidoLOG.debug("@@@@ forcing load of Guido classes done.");
 	}
 
 	private Map<String, Object> buildConstructorArg() {
@@ -550,7 +567,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 				cclass = cclass.getSuperclass();
 			}
 		} catch(Exception e) {
-			guidoLOG.error("Cannot check class {}", cclass.getName(), e);
+			guidoLOG.error(e, "Cannot check class {}", cclass.getName());
 			return false;
 		}
 		return true;

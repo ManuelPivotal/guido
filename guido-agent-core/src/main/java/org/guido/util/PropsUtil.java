@@ -33,4 +33,15 @@ public class PropsUtil {
 	public static boolean getPropOrEnvBoolean(String name) {
 		return getPropOrEnvBoolean(name, false);
 	}
+
+	public static int getPropOrEnvInt(String name, int defaultValue) {
+		String value = System.getProperty(name);
+		if(value == null) {
+			value = System.getenv(name);
+		}
+		if(value == null) {
+			return defaultValue;
+		}
+		return Integer.valueOf(value);
+	}
 }
