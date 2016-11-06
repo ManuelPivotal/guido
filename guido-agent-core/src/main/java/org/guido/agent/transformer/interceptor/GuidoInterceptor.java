@@ -21,7 +21,6 @@ public class GuidoInterceptor {
 	public static String pid;
 	public static long threshold = 500000; // (0.5 ms)
 	static public Map<String, String> extraProps;
-	static public CountDownLatch stopMeLatch;
 	
 	public static final int MAX_STACK_DEPTH = 128;
 	
@@ -39,7 +38,6 @@ public class GuidoInterceptor {
 		GuidoInterceptor.pid = (String)paramMap.get("pid");
 		GuidoInterceptor.threshold = (long)paramMap.get("threshold");
 		GuidoInterceptor.extraProps = (Map<String, String>)paramMap.get("extraprops");
-		GuidoInterceptor.stopMeLatch = (CountDownLatch) paramMap.get("stopMeLatch");
 	}
 	
 	static public Class<?>[] toLoad = new Class<?>[] {
@@ -137,13 +135,5 @@ public class GuidoInterceptor {
 		localRefStack.set(stack);
 		threadUuid.set(UUID.randomUUID().toString());
 		positionInStack.set(new SimpleOpInteger());
-	}
-
-	public static String insertStopme() {
-		return "{ org.guido.agent.transformer.interceptor.GuidoInterceptor.stop(); }";
-	}
-	
-	static public void stop() {
-		GuidoInterceptor.stopMeLatch.countDown();
 	}
 }

@@ -60,6 +60,7 @@ import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.LoaderClassPath;
+import oss.guido.javassist.NotFoundException;
 import oss.guido.net.logstash.logback.appender.LoggingEventAsyncDisruptorAppender;
 import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
 import oss.guido.org.slf4j.MDC;
@@ -184,7 +185,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	private String GUIDO_BITBUCKET_PASSWORD = "guido.bitbucket.password";
 
 	private void createClassConfigurer() {
-		classConfigurer = new PatternMethodConfigurer();
+		classConfigurer = new PatternMethodConfigurer(PropsUtil.getPropOrEnv("guido.ext.hostname"));
 		classConfigurer.defaultIsOff();
 		if(getPropOrEnvBoolean("guido.showRules")) {
 			classConfigurer.showMethodRules();
@@ -428,11 +429,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 	}
 	
 	private void startQListeners() {
-		int totalThreads = logQListeners;
-		if(statsFlag) {
-			totalThreads++;
-		}
-		//qListenerExecutor = Executors.newFixedThreadPool(totalThreads);
 		for(int index = 0; index < logQListeners; index++) {
 			qTransformerExecutor.submit(new LOGQListener());
 		}
@@ -551,10 +547,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 			interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
 		} catch(Exception e) {
 			Throwable rootCause = ExceptionUtil.getRootCause(e);
-			if(rootCause instanceof LinkageError || rootCause instanceof CannotCompileException) {
+			if(rootCause instanceof NotFoundException || rootCause instanceof LinkageError || rootCause instanceof CannotCompileException) {
 				return;
 			}
-			guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
+			return;
+			// guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
 		} catch(LinkageError le) {
 			// already in the class loader space
 		}
@@ -568,7 +565,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 		params.put("pid", GuidoInterceptor.pid);
 		params.put("threshold", GuidoInterceptor.threshold);
 		params.put("extraprops", GuidoInterceptor.extraProps);
-		params.put("stopMeLatch", GuidoInterceptor.stopMeLatch);
 		return params;
 	}
 	

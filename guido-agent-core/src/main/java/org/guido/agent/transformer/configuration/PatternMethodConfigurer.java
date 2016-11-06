@@ -16,20 +16,31 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 	
 	GuidoLogger LOG = GuidoLogger.getLogger("PatternMethodConfigurer");
 	
+	private String target;
+	
 	public interface Reload {
 		void doReload();
+	}
+	
+	public PatternMethodConfigurer() {
+		this(null);
+	}
+	
+	public PatternMethodConfigurer(String target) {
+		this.target = target;
 	}
 	
 	boolean loadInError = false;
 	List<PatternMethodConfig> perClassConfigs = new ArrayList<PatternMethodConfig>();
 	List<PatternMethodConfig> tmpPerClassConfigs;
 	
-	PatternMethodConfig notAllowedConfig = new PatternMethodConfig(null, -1, false);
-	PatternMethodConfig allowedConfig = new PatternMethodConfig(null, -1, true);
+	PatternMethodConfig notAllowedConfig = new PatternMethodConfig(null, -1, false, false);
+	PatternMethodConfig allowedConfig = new PatternMethodConfig(null, -1, true, false);
 	
 	private Reload reload;
 	
 	AntPathMatcher pathMatcher = new AntPathMatcher();
+	AntPathMatcher targetMatcher = new AntPathMatcher("|");
 	
 	boolean defaultAllOff = true;
 	boolean showMethodRules = false;
@@ -72,7 +83,7 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		PatternMethodConfig classConfig = parseLine(line);
 		if(classConfig != null) {
 			if(showMethodRules) {
-				LOG.info("Adding rule {}", line);
+				LOG.info("Adding rule {} for group {}", line, target);
 			}
 			tmpPerClassConfigs.add(classConfig);
 		}
@@ -84,6 +95,21 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 			return null;
 		}
 		String className = split[0];
+		String[] target = split[0].split("@");
+		if(target.length == 2) {
+			if(!targetingUs(target[1])) {
+				return null;
+			}
+			LOG.debug("{} is tragetting {}", target[0], target);
+			className = target[0];
+		}
+		boolean isInterface = false;
+		int classNameLength = className.length();
+		if(classNameLength > 2 && className.startsWith("[") && className.endsWith("]")) {
+			className = className.substring(1, classNameLength - 1);
+			isInterface = true;
+		}
+		
 		String[] infos = split[1].split(",");
 		long threshold = -1;
 		boolean allowed = true;
@@ -97,7 +123,11 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 				allowed = false;
 			}
 		}
-		return new PatternMethodConfig(className, threshold, allowed);
+		return new PatternMethodConfig(className, threshold, allowed, isInterface);
+	}
+
+	private boolean targetingUs(String configurationTarget) {
+		return targetMatcher.match(configurationTarget, target);
 	}
 
 	public void loadClassConfig(ConfigurationWatcher watcher, final Reload reload) {
@@ -108,7 +138,7 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 	
 	public PatternMethodConfig configFor(CtMethod method) {
 		String rootMethod = method.getDeclaringClass().getName() +  "." + method.getName();
-		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod);
+		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod, false);
 		if(!config.allowed) {
 			return configForInterfaces(method.getDeclaringClass(), method, rootMethod);
 		}
@@ -120,12 +150,10 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 			CtClass[] interfaces = clazz.getInterfaces();
 			for(CtClass itf : interfaces) {
 				try {
-					//debug("getting methods " + method.getName() + " in interface " + itf.getName());
 					CtMethod[] methods = itf.getDeclaredMethods(method.getName());
 					for(CtMethod sub : methods) {
 						if(sub.equals(method)) {
-							//debug("methods are equals, checking rules for method in interface");
-							return configFor(itf, method, rootMethod);
+							return configFor(itf, method, rootMethod, true);
 						}
 					}
 				} catch(Exception e) {
@@ -149,13 +177,18 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		return defaultAllOff;
 	}
 
-	protected PatternMethodConfig configFor(CtClass clazz, CtMethod method, String rootMethod) {
+	protected PatternMethodConfig configFor(CtClass clazz, CtMethod method, String rootMethod, boolean isInterface) {
 		String methodName = clazz.getName() +  "." + method.getName();
 		boolean foundOn = false;
 		boolean foundOff = false;
 		PatternMethodConfig foundOnConfig = allowedConfig;
 		
 		for(PatternMethodConfig config : perClassConfigs) {
+			if(isInterface) {
+				if(!config.isInterface() && config.isAllowed()) {
+					continue;
+				}
+			}
 			if(pathMatcher.match(config.className, methodName)) {
 				if(config.isAllowed()) {
 					if(showMethodRules) {

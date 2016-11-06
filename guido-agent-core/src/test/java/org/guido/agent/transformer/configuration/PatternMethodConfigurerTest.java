@@ -11,6 +11,7 @@ import java.util.List;
 import junit.framework.Assert;
 
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
+import org.guido.agent.transformer.logger.GuidoLogger;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
@@ -21,6 +22,10 @@ import oss.guido.javassist.CtMethod;
 public class PatternMethodConfigurerTest {
 	
 	static ClassPool pool;
+	static GuidoLogger LOG = GuidoLogger.getLogger(PatternMethodConfigurerTest.class);
+	static {
+		GuidoLogger.setGlobalLogLevel(GuidoLogger.DEBUG);
+	}
 	
 	@BeforeClass
 	static public void init() {
@@ -71,6 +76,37 @@ public class PatternMethodConfigurerTest {
 		}
 	}
 	
+	@Test
+	public void canParseLineWithTarget() {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer("me-and.myhost");
+		PatternMethodConfig lineConfig;
+		lineConfig = configurer.parseLine("**.a.b.c.**@me**=threshold:20,off");
+		Assert.assertNotNull(lineConfig);
+		Assert.assertEquals("**.a.b.c.**", lineConfig.getClassName());
+		Assert.assertEquals((long)(20 * 1000000), lineConfig.getThreshold());
+		Assert.assertEquals(false, lineConfig.isAllowed());
+	}
+
+	@Test
+	public void canIgnoreLineWithWrongTarget() {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer("me-and.myhost");
+		PatternMethodConfig lineConfig;
+		lineConfig = configurer.parseLine("**.a.b.c.**@abc**=threshold:20,off");
+		Assert.assertNull(lineConfig);
+	}
+	
+	@Test
+	public void canParseInferfaces() {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer("me-and.myhost");
+		PatternMethodConfig lineConfig;
+		lineConfig = configurer.parseLine("[**.a.b.c.**]@me**=threshold:20,off");
+		Assert.assertNotNull(lineConfig);
+		Assert.assertEquals("**.a.b.c.**", lineConfig.getClassName());
+		Assert.assertEquals((long)(20 * 1000000), lineConfig.getThreshold());
+		Assert.assertEquals(false, lineConfig.isAllowed());
+		Assert.assertEquals(true, lineConfig.isInterface());
+	}
+
 	@Test
 	public void configSetIfConfigFileDoesExist() {
 		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
@@ -199,7 +235,7 @@ public class PatternMethodConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.startConfigure();
 		configurer.addLine("**=off");
-		configurer.addLine("java.sql.Driver.*=on,threshold:10");
+		configurer.addLine("[java.sql.Driver.*]=on,threshold:10");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
@@ -223,7 +259,7 @@ public class PatternMethodConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		
 		configurer.startConfigure();
-		configurer.addLine("java.sql.Driver.*=on");
+		configurer.addLine("[java.sql.Driver.*]=on");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
@@ -233,7 +269,7 @@ public class PatternMethodConfigurerTest {
 
 		configurer.startConfigure();
 		configurer.addLine("**=off");
-		configurer.addLine("java.sql.Driver.*=on");
+		configurer.addLine("[java.sql.Driver.*]=on");
 		configurer.endConfigure();
 		
 		for(CtMethod method : driver.getDeclaredMethods()) {
@@ -252,7 +288,7 @@ public class PatternMethodConfigurerTest {
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.startConfigure();
 		configurer.addLine("**=off");
-		configurer.addLine("java.sql.Connection.*=on");
+		configurer.addLine("[java.sql.Connection.*]=on");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
@@ -260,17 +296,34 @@ public class PatternMethodConfigurerTest {
 			Assert.assertEquals(true, methodConfig.isAllowed() == methods.contains(method));
 		}
 	}
+	
+	@Test
+	public void doNotConfuseClassesAndInterfaces() throws Exception {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
+		configurer.defaultIsOff();
+
+		CtClass driver = pool.get("org.postgresql.jdbc.PgConnection");
+		configurer.startConfigure();
+		configurer.addLine("java.sql.Connection.*=on");
+		configurer.endConfigure();
+
+		for(CtMethod method : driver.getDeclaredMethods()) {
+			PatternMethodConfig methodConfig = configurer.configFor(method);
+			Assert.assertFalse(methodConfig.isAllowed());
+		}
+	}
 
 	@Test
 	public void canCheckInheritedInterfacesWithDefaultOff() throws Exception {
 		PatternMethodConfigurer configurer = new PatternMethodConfigurer();
 		configurer.defaultIsOff();
+		configurer.showMethodRules();
 
 		CtClass driver = pool.get("org.postgresql.jdbc.PgConnection");
 		CtClass itf = pool.get("java.sql.Connection");
 		List<CtMethod> methods = Arrays.asList(itf.getDeclaredMethods());
 		configurer.startConfigure();
-		configurer.addLine("java.sql.Connection.*=on");
+		configurer.addLine("[java.sql.Connection.*]=on");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
@@ -280,12 +333,43 @@ public class PatternMethodConfigurerTest {
 
 		configurer.startConfigure();
 		configurer.addLine("**=off");
-		configurer.addLine("java.sql.Connection.*=on");
+		configurer.addLine("[java.sql.Connection.*]=on");
 		configurer.endConfigure();
 
 		for(CtMethod method : driver.getDeclaredMethods()) {
 			PatternMethodConfig methodConfig = configurer.configFor(method);
 			Assert.assertEquals(false, methodConfig.isAllowed());
 		}
+	}
+	@Test
+	public void canFindLastThreshold() throws Exception {
+		PatternMethodConfigurer configurer = new PatternMethodConfigurer("me");
+		configurer.defaultIsOff();
+		
+		configurer.startConfigure();
+		configurer.addLine("org.**=on,threshold:10");
+		configurer.addLine("org.postgresql.**=on,threshold:20");
+		//configurer.addLine("org.postgresql.jdbc.PgConnection=on,threshold:30");
+		configurer.endConfigure();
+		
+		CtClass driver = pool.get("org.postgresql.jdbc.PgConnection");
+		for(CtMethod method : driver.getDeclaredMethods()) {
+			PatternMethodConfig methodConfig = configurer.configFor(method);
+			Assert.assertEquals(true, methodConfig.isAllowed());
+			Assert.assertEquals(20 * 1000000, methodConfig.getThreshold());
+		}
+
+		configurer.startConfigure();
+		configurer.addLine("org.**=on,threshold:10");
+		configurer.addLine("org.postgresql.**=on,threshold:20");
+		configurer.addLine("org.postgresql.jdbc.PgConnection=on,threshold:30");
+		configurer.endConfigure();
+
+		for(CtMethod method : driver.getDeclaredMethods()) {
+			PatternMethodConfig methodConfig = configurer.configFor(method);
+			Assert.assertEquals(true, methodConfig.isAllowed());
+			Assert.assertEquals(20 * 1000000, methodConfig.getThreshold());
+		}
+
 	}
 }
