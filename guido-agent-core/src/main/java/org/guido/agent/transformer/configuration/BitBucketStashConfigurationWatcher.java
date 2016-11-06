@@ -64,14 +64,14 @@ public class BitBucketStashConfigurationWatcher extends AbstractConfigurationWat
 	URLAuth urlAuth;
 	
 	public BitBucketStashConfigurationWatcher() {
-		this(null, 0);
+		this(null, null, null, 0);
 	}
 	
-	public BitBucketStashConfigurationWatcher(String configurationPath, int secondsBetweenPolls) {
+	public BitBucketStashConfigurationWatcher(String configurationPath, String userName, String password, int secondsBetweenPolls) {
 		super(configurationPath, secondsBetweenPolls);
 		if(configurationPath != null) {
 			try {
-				urlAuth = URLAuth.createFrom(configurationPath);
+				urlAuth = URLAuth.createFrom(configurationPath, userName, password);
 			} catch(MalformedURLException mfe) {
 				LOG.error(mfe, "Invalid bitbucket URL");
 				throw new RuntimeException(mfe);

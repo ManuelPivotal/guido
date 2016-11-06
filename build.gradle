@@ -19,7 +19,7 @@ subprojects {
 	
     group = 'org.guido'
 
-    version = '1.0.9'
+    version = '1.0.11'
 	
     project.sourceCompatibility = 1.7
     project.targetCompatibility = 1.7

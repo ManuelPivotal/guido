@@ -80,10 +80,10 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 		}
 	}
 	
-	public GithubConfigurationWatcher(String configurationPath, int secondsBetweenPolls) {
+	public GithubConfigurationWatcher(String configurationPath, String userName, String password, int secondsBetweenPolls) {
 		super(configurationPath, secondsBetweenPolls);
 		try {
-			urlAuth = URLAuth.createFrom(configurationPath);
+			urlAuth = URLAuth.createFrom(configurationPath, userName, password);
 		} catch(MalformedURLException mfe) {
 			LOG.error(mfe, "Invalid URL", configurationPath);
 			throw new RuntimeException(mfe);

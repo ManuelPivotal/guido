@@ -1,11 +1,15 @@
 package org.guido.util;
 
+import org.guido.agent.transformer.logger.GuidoLogger;
+
 public class PropsUtil {
+	
+	//private static GuidoLogger LOG = GuidoLogger.getLogger(PropsUtil.class);
 	
 	public static String getPropOrEnv(String name, String defaultValue) {
 		String value = System.getProperty(name);
 		if(value == null) {
-			value = System.getenv(name);
+			value = getEnv(name);
 		}
 		return (value == null) ? defaultValue : value;
 	}
@@ -22,7 +26,7 @@ public class PropsUtil {
 	public static boolean getPropOrEnvBoolean(String name, boolean defaultValue) {
 		String value = System.getProperty(name);
 		if(value == null) {
-			value = System.getenv(name);
+			value = getEnv(name);
 		}
 		if(value == null) {
 			return defaultValue;
@@ -37,11 +41,22 @@ public class PropsUtil {
 	public static int getPropOrEnvInt(String name, int defaultValue) {
 		String value = System.getProperty(name);
 		if(value == null) {
-			value = System.getenv(name);
+			value = getEnv(name);
 		}
 		if(value == null) {
 			return defaultValue;
 		}
 		return Integer.valueOf(value);
+	}
+	
+	public static String turnToEnvName(String name) {
+		return name.toUpperCase().replaceAll("\\.", "_");
+	}
+	
+	private static String getEnv(String name) {
+		if(name == null) {
+			return null;
+		}
+		return System.getenv(turnToEnvName(name));
 	}
 }

@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingDeque;
 
 import org.guido.agent.logs.provider.GuidoJsonJsonMessageProvider;
@@ -44,6 +45,7 @@ import org.guido.agent.transformer.interceptor.GuidoInterceptor;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.ExceptionUtil;
 import org.guido.util.PropsUtil;
+import org.guido.util.ThreadExecutorUtils;
 
 import oss.guido.ch.qos.logback.classic.Level;
 import oss.guido.ch.qos.logback.classic.Logger;
@@ -53,6 +55,7 @@ import oss.guido.ch.qos.logback.core.Appender;
 import oss.guido.ch.qos.logback.core.ConsoleAppender;
 import oss.guido.ch.qos.logback.core.util.Duration;
 import oss.guido.javassist.ByteArrayClassPath;
+import oss.guido.javassist.CannotCompileException;
 import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
@@ -68,7 +71,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	
 	List<String> addedClassLoader = new ArrayList<String>();
 	ClassPool pool;
-	LinkedBlockingDeque<Object[]> queue = new LinkedBlockingDeque<Object[]>();
+	LinkedBlockingDeque<Object[]> queue = new LinkedBlockingDeque<Object[]>(8192);
 	List<Object[]> references = new ArrayList<Object[]>(32 * 1024);
 	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
 	Map<String, String> extraProps = new HashMap<String, String>();
@@ -102,7 +105,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		buildAddons();
 		createLogger();
 		createDefaults();
-		setPid();
+		setInterceptorRefs();
 		getQListenersCount();
 		startQListeners();
 		startMemoryStats();
@@ -177,6 +180,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 		}
 	}
 
+	private String GUIDO_BITBUCKET_USER = "guido.bitbucket.user";
+	private String GUIDO_BITBUCKET_PASSWORD = "guido.bitbucket.password";
+
 	private void createClassConfigurer() {
 		classConfigurer = new PatternMethodConfigurer();
 		classConfigurer.defaultIsOff();
@@ -187,21 +193,31 @@ public class GuidoTransformer implements ClassFileTransformer {
 		String configFile = PropsUtil.getPropOrEnv("guido.classconfig");
 		String gitHubURL = PropsUtil.getPropOrEnv("guido.githuburl");
 		String bitBucketURL = PropsUtil.getPropOrEnv("guido.bitbucketurl");
-		
+
 		if(bitBucketURL != null) {
-			classConfigurer.loadClassConfig(new BitBucketStashConfigurationWatcher(bitBucketURL, 30), new Reload() {
-				@Override
-				public void doReload() {
-					reloadAllReferences();
-				}
+			classConfigurer.loadClassConfig(
+						new BitBucketStashConfigurationWatcher(bitBucketURL, 
+								PropsUtil.getPropOrEnv(GUIDO_BITBUCKET_USER),
+								PropsUtil.getPropOrEnv(GUIDO_BITBUCKET_PASSWORD),
+								30), 
+							new Reload() {
+								@Override
+								public void doReload() {
+									reloadAllReferences();
+								}
 			});
 		}
 		if(gitHubURL != null) {
-			classConfigurer.loadClassConfig(new GithubConfigurationWatcher(gitHubURL, 30), new Reload() {
-				@Override
-				public void doReload() {
-					reloadAllReferences();
-				}
+			classConfigurer.loadClassConfig(
+					new GithubConfigurationWatcher(gitHubURL, 
+								PropsUtil.getPropOrEnv(GUIDO_BITBUCKET_USER),
+								PropsUtil.getPropOrEnv(GUIDO_BITBUCKET_PASSWORD),
+								30), 
+						new Reload() {
+							@Override
+							public void doReload() {
+								reloadAllReferences();
+							}
 			});
 		} else if(configFile != null) {
 			classConfigurer.loadClassConfig(new FileConfigurationWatcher(configFile, 30), new Reload() {
@@ -240,7 +256,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		this.threshold = PropsUtil.toNano(thresholdProp);
 	}
 
-	private void setPid() {
+	private void setInterceptorRefs() {
 		pid = UUID.randomUUID().toString();
 		GuidoInterceptor.pid = pid;
 	}
@@ -345,69 +361,83 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return ref;
 	}
 	
-	private void startQListeners() {
-		for(int index = 0; index < logQListeners; index++) {
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					for(;;) {
-						try {
-							Object[] logContents = queue.take();
-							logContents[4] = toMicroSec(logContents[4]);
-							LOG.info("pid={} threadUuid={} depth={} methodCalled={} duration={}", logContents);
-							if(statsFlag) {
-								logRate.increment();
-							}
-						} catch(InterruptedException ie) {
-							guidoLOG.error("ie exception in loop take()");
-							return;
-						} catch(Exception e) {
-							guidoLOG.error("exception in loop take()", e);
-						}
-					}
-				}
+	ExecutorService qTransformerExecutor = ThreadExecutorUtils.newFixedThreadPool(10);
 
-				private Object toMicroSec(Object object) {
-					Double duration = (double)(long)object;
-					return duration / 1000.00;
+	
+	class LOGQListener implements Runnable {
+		@Override
+		public void run() {
+			for(;;) {
+				try {
+					Object[] logContents = queue.take();
+					logContents[4] = toMicroSec(logContents[4]);
+					LOG.info("pid={} threadUuid={} depth={} methodCalled={} duration={}", logContents);
+					if(statsFlag) {
+						logRate.increment();
+					}
+				} catch(InterruptedException ie) {
+					guidoLOG.error("ie exception in loop take()");
+					return;
+				} catch(Exception e) {
+					guidoLOG.error("exception in loop take()", e);
 				}
-			}).start();
+			}
+		}
+
+		private Object toMicroSec(Object object) {
+			Double duration = (double)(long)object;
+			return duration / 1000.00;
+		}
+	}
+	
+	class MemStatsDumper implements Runnable {				
+		@Override
+		public void run() {
+			guidoLOG.info("stats dump thread started");
+			DecimalFormat df = new DecimalFormat("###,###.###"); 
+			//NumberFormat numberFormat = new NumberFormat("###,###");
+			for(;;) {
+				try {
+					Thread.sleep(30 * 1000);
+					Statistics stats = logRate.getStatistics();
+					guidoLOG.info("{[sent={}]}", df.format(stats.getCountLong()));
+					int total = 0;
+					int totalOn = 0;
+					int totalOff = 0;
+					for(Object[] ref : references) {
+						if((boolean)ref[REF_ALLOWED]) {
+							totalOn++;
+						} else {
+							totalOff++;
+						}
+						total++;
+					}
+					guidoLOG.info("Total method is {}, {} on, {} off",
+							total, 
+							totalOn,
+							totalOff);
+				} catch(InterruptedException ie) {
+					guidoLOG.info("InterruptedException in loop take()");
+					return;
+				} catch(Exception e) {
+					guidoLOG.error(e, "exception in thred stat dump");
+					return;
+				}
+			}
+		}
+	}
+	
+	private void startQListeners() {
+		int totalThreads = logQListeners;
+		if(statsFlag) {
+			totalThreads++;
+		}
+		//qListenerExecutor = Executors.newFixedThreadPool(totalThreads);
+		for(int index = 0; index < logQListeners; index++) {
+			qTransformerExecutor.submit(new LOGQListener());
 		}
 		if(statsFlag) {
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					guidoLOG.info("stats dump thread started");
-					DecimalFormat df = new DecimalFormat("###,###.###"); 
-					//NumberFormat numberFormat = new NumberFormat("###,###");
-					for(;;) {
-						try {
-							Thread.sleep(30 * 1000);
-							Statistics stats = logRate.getStatistics();
-							guidoLOG.info("{[sent={} - avg(s)={}]}", df.format(stats.getCountLong()), df.format(stats.getMean()));
-							int total = 0;
-							int totalOn = 0;
-							int totalOff = 0;
-							for(Object[] ref : references) {
-								if((boolean)ref[REF_ALLOWED]) {
-									totalOn++;
-								} else {
-									totalOff++;
-								}
-								total++;
-							}
-							guidoLOG.info("Total method is " + total 
-									+ ", " + totalOn + " on, " + totalOff + " off");
-						} catch(InterruptedException ie) {
-							guidoLOG.error("ie exception in loop take()");
-							return;
-						} catch(Exception e) {
-							guidoLOG.error("exception in thred stat dump", e);
-							return;
-						}
-					}
-				}
-			}).start();
+			qTransformerExecutor.submit(new MemStatsDumper());
 		}
 	}
 	
@@ -419,35 +449,30 @@ public class GuidoTransformer implements ClassFileTransformer {
 								byte[] classfileBuffer) throws IllegalClassFormatException {
 		try {
 			// A null loader means the bootstrap loader.
-			// We do not instrument classes loaded by the bootstrap loader.
-			if(loader == null) {
+			// We do not instrument classes loaded by the bootstrap loader nor unnamed classes
+			if(loader == null || className == null) {
 				return null;
 			}
-			
+
+			ClassPool newPool = new ClassPool(ClassPool.getDefault());
+			newPool.insertClassPath(new LoaderClassPath(loader));
+
 			addLoaderToPool(loader, protectionDomain);
 			
-			if(className == null) {
-				guidoLOG.info("classname is null");
-				if(classBeingRedefined != null) {
-					guidoLOG.info("classBeingRedefined is " + classBeingRedefined.getCanonicalName());
-				}
-				if(classfileBuffer != null) {
-					guidoLOG.info("classfileBuffer is not null");
-				}
-				return null;
-			}
-			
-			pool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
+			newPool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
 			CtClass cclass = null;
 			
 			try {
-				cclass = pool.get(className.replaceAll("/", "."));
+				cclass = newPool.get(className.replaceAll("/", "."));
 			} catch(Exception e) {
-				//guidoLOG.error(e, "{} not in pool", className);
 				return null;
 			}
 			
-			if(isObservableClass(cclass)) {
+			if(isClassLoader(cclass)) {
+				return null; //createHook(cclass);
+			}
+			
+			if(isObservableByName(cclass)) {
 				boolean changed = false;
 				for(CtMethod method : cclass.getDeclaredMethods()) {
 					if(!method.isEmpty()) {
@@ -496,10 +521,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 			String signature = String.valueOf(loader.hashCode());
 			if(!addedClassLoader.contains(signature)) {
 				guidoLOG.debug("Adding new class loader of {} signature [{}]", loaderClass, signature);
-				guidoLOG.debug("@@@@ adding class loader of class " + loader.getClass().getCanonicalName());
-				guidoLOG.debug("@@@@ loader instance of ClassLoader is " + (loader instanceof ClassLoader));
 				addedClassLoader.add(signature);
-				pool.insertClassPath(new LoaderClassPath(loader));
+				//pool.insertClassPath(new LoaderClassPath(loader));
 				forceGuidoClassesToLoader(loader, protectionDomain);
 			}
 		}
@@ -527,10 +550,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 			Map<String, Object> params = buildConstructorArg();
 			interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
 		} catch(Exception e) {
-			if(!(ExceptionUtil.getRootCause(e) instanceof LinkageError)) {
-				guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
+			Throwable rootCause = ExceptionUtil.getRootCause(e);
+			if(rootCause instanceof LinkageError || rootCause instanceof CannotCompileException) {
+				return;
 			}
-			return;
+			guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
 		} catch(LinkageError le) {
 			// already in the class loader space
 		}
@@ -544,14 +568,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 		params.put("pid", GuidoInterceptor.pid);
 		params.put("threshold", GuidoInterceptor.threshold);
 		params.put("extraprops", GuidoInterceptor.extraProps);
+		params.put("stopMeLatch", GuidoInterceptor.stopMeLatch);
 		return params;
 	}
 	
-	private boolean isObservableClass(CtClass cclass) {
-		return isObservableByName(cclass) && isObservableByClass(cclass);
-	}
-	
-	private boolean isObservableByClass(CtClass cclass) {
+	private boolean isClassLoader(CtClass cclass) {
 		if(cclass.isFrozen()) {
 			return false;
 		}
@@ -562,7 +583,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 				String className = cclass.getName();
 				if(classLoader.equals(className)) {
 					guidoLOG.debug(parentClass + " is a ClassLoader");
-					return false;
+					return true;
 				}
 				cclass = cclass.getSuperclass();
 			}
@@ -570,9 +591,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 			guidoLOG.error(e, "Cannot check class {}", cclass.getName());
 			return false;
 		}
-		return true;
+		return false;
 	}
-
+	
 	String forbiddenStarts[] = new String[] {
 			"java/", 
 			"javax/", 
@@ -580,14 +601,12 @@ public class GuidoTransformer implements ClassFileTransformer {
 			"com/sun/", 
 			"org/guido/", 
 			"oss/guido/",
-			//"org/springframework/",
 			"java.", 
 			"javax.", 
 			"sun.", 
 			"com.sun.", 
 			"org.guido.",
 			"oss.guido."
-			//"org.springframework."
 			};
 	
 	private boolean isObservableByName(CtClass cclass) {

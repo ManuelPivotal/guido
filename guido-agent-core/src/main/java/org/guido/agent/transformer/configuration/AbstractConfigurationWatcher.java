@@ -1,6 +1,9 @@
 package org.guido.agent.transformer.configuration;
 
+import java.util.concurrent.ExecutorService;
+
 import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.util.ThreadExecutorUtils;
 
 public abstract class AbstractConfigurationWatcher implements ConfigurationWatcher, Runnable {
 	
@@ -35,23 +38,12 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 	protected abstract void doStart();
 	protected abstract void doWatch();
 	protected void doTerminate() {}
+	
+	ExecutorService watchService = ThreadExecutorUtils.newSingleThreadExecutor();
 
 	@Override
 	public void start() {
-		//doStart();
-		new Thread(new Runnable(){
-			@Override
-			public void run() {
-				try {
-					for(;;) {
-						Thread.sleep(Long.MAX_VALUE);
-					}
-				} catch(InterruptedException ie) {
-					doTerminate();
-				}
-			}
-		}).start();
-		new Thread(this).start();
+		watchService.submit(this);
 	}
 	
 	public void stop() {
@@ -64,6 +56,10 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 		for(;;) {
 			try {
 				doWatch();
+				if(Thread.interrupted()) {
+					guidoLOG.info("is interrupted is true - exiting");
+					return;
+				}
 				if(needStop) {
 					return;
 				}
@@ -72,6 +68,7 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 					return;
 				}
 			} catch(InterruptedException ie) {
+				guidoLOG.info("received InterruptedException - exiting");
 				return;
 			} catch(Exception e) {
 				guidoLOG.error(e, "error in the watch thread, path is {}", configurationPath);

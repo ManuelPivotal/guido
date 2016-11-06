@@ -1,0 +1,17 @@
+# This file is used to configure guido
+# 
+# As soon as this file is commited the guido agents re-read the changes and apply them
+#
+
+*|**=on,threshold:10000
+*|**.vocado.**=on,threshold:0
+
+prod|**=off
+
+sa-*|**=on,threshold:1000
+sa-bpm*|**=on,threshold:0
+sa-*|**.hazelcast.**=on
+sa-mpg*|**.tomcat.**=on
+
+# logs all classes inheriting from java.sql interfaces, whatever is the time spent in the method
+# *|java.sql.**=threshold:0,on

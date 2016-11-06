@@ -4,9 +4,6 @@ import static java.lang.management.ManagementFactory.getGarbageCollectorMXBeans;
 import static java.lang.management.ManagementFactory.getOperatingSystemMXBean;
 
 import java.lang.management.GarbageCollectorMXBean;
-import java.lang.management.ManagementFactory;
-import java.lang.management.MemoryUsage;
-import java.lang.management.ThreadMXBean;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -14,6 +11,7 @@ import java.util.Set;
 import javax.management.NotificationEmitter;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.util.ThreadExecutorUtils;
 
 import oss.guido.org.slf4j.Logger;
 
@@ -77,8 +75,7 @@ public class MemoryUsageStats implements Runnable {
 	
 	public void start() {
 		LOG.info("starting mem stat thread - poll time is {} ms",  pollDelay);
-		new Thread(this).start();
-		//installGCMonitoring();
+		ThreadExecutorUtils.newSingleThreadExecutor().submit(this);
 	}	
 	
 	protected void installGCMonitoring() {    

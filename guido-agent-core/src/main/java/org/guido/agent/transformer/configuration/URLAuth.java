@@ -7,7 +7,7 @@ import java.util.Base64;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
 
-class URLAuth implements Runnable {
+class URLAuth  {
 	private static final int CONNECT_TIMEOUT = 15000;
 	private static final int READ_TIMEOUT = 15000;
 
@@ -24,16 +24,23 @@ class URLAuth implements Runnable {
 	
 	private URLAuth() {}
 	
-	static public URLAuth createFrom(String httpUrl) throws MalformedURLException {
+	static public URLAuth createFrom(String httpUrl, String userName, String password) throws MalformedURLException {
+		LOG.debug("url={}, username={}, password={}",
+				httpUrl, userName, (password == null ? "null" : "********"));
 		URLAuth urlAuth = new URLAuth();
 		urlAuth.displayableUrl = httpUrl;
-		int lastAt = httpUrl.lastIndexOf('@');
-		if(lastAt != -1) {
-			int urlStartIndex = httpUrl.indexOf("://");
-			String credentials = httpUrl.substring(urlStartIndex + 3, lastAt);
+		if(userName == null || password == null) {
+			int lastAt = httpUrl.lastIndexOf('@');
+			if(lastAt != -1) {
+				int urlStartIndex = httpUrl.indexOf("://");
+				String credentials = httpUrl.substring(urlStartIndex + 3, lastAt);
+				urlAuth.base64Credentials = new String(Base64.getEncoder().encode(credentials.getBytes()));
+				urlAuth.displayableUrl = httpUrl.replace(credentials + "@", hidePassword(credentials) + "@");
+				httpUrl = httpUrl.replace(credentials + "@", "");
+			}
+		} else if(userName != null && password != null) {
+			String credentials = userName + ":" + password;
 			urlAuth.base64Credentials = new String(Base64.getEncoder().encode(credentials.getBytes()));
-			urlAuth.displayableUrl = httpUrl.replace(credentials + "@", hidePassword(credentials) + "@");
-			httpUrl = httpUrl.replace(credentials + "@", "");
 		}
 		LOG.info("URL is {}", urlAuth.displayableUrl);
 		new URL(httpUrl); // will throw an exception if malformed
@@ -103,15 +110,14 @@ class URLAuth implements Runnable {
 			
 		}
 	}
-
-	@Override
-	public void run() {
-		for(;;) {
-			try {
-				Thread.sleep(Long.MAX_VALUE);
-			} catch (InterruptedException e) {
-				quietClose();
-			}
-		}
-	}
+//	@Override
+//	public void run() {
+//		for(;;) {
+//			try {
+//				Thread.sleep(Long.MAX_VALUE);
+//			} catch (InterruptedException e) {
+//				quietClose();
+//			}
+//		}
+//	}
 }

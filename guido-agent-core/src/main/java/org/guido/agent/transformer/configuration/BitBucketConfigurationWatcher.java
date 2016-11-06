@@ -74,7 +74,7 @@ public class BitBucketConfigurationWatcher extends AbstractConfigurationWatcher 
 		super(configurationPath, secondsBetweenPolls);
 		if(configurationPath != null) {
 			try {
-				urlAuth = URLAuth.createFrom(configurationPath);
+				urlAuth = URLAuth.createFrom(configurationPath, null, null);
 			} catch(MalformedURLException mfe) {
 				LOG.error(mfe, "Invalid URL {}", configurationPath);
 				throw new RuntimeException(mfe);
