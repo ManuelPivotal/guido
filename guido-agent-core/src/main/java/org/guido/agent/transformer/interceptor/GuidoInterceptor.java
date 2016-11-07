@@ -60,7 +60,7 @@ public class GuidoInterceptor {
 	}
 	
 	static public String insertAfter() {
-		return "{ org.guido.agent.transformer.interceptor.GuidoInterceptor.pop($args); }";
+		return "{ org.guido.agent.transformer.interceptor.GuidoInterceptor.pop(); }";
 	}
 	
 	public static String addCatch() {
@@ -72,9 +72,6 @@ public class GuidoInterceptor {
 	}
 
 	static public void push(int index) {
-		if(Thread.interrupted()) {
-			System.out.println(" >>>>> thread is interrupted");
-		}
 		InThreadStackElement[] stack = localRefStack.get();
 		if(stack == null) {
 			initTLSElements();
@@ -88,10 +85,11 @@ public class GuidoInterceptor {
 		return stackElement.deltaTime > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
 	}
 	
-	static public void pop(Object[] args) {
+	static public void pop() {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
 			if(passes(stackElement)) {
+				//dumpClassLoaders();
 				Object[] objects = buildObjectCommon(stackElement);
 				totalsent++;
 				boolean offered = queue.offer(objects);
@@ -100,6 +98,12 @@ public class GuidoInterceptor {
 				}
 			}
 		}
+	}
+	static private void dumpClassLoaders() {
+		System.out.println(String.format("GuidoInterceptor classloader is %s ", 
+							GuidoInterceptor.class.getClassLoader()));
+		System.out.println(String.format("Thread class loader is %s", 
+							Thread.currentThread().getContextClassLoader()));
 	}
 	
 	static public void popInError(Throwable t) {

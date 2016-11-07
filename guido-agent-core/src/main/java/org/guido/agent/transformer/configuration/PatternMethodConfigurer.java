@@ -125,11 +125,21 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		}
 		return new PatternMethodConfig(className, threshold, allowed, isInterface);
 	}
+	
+	class NullReload implements Reload {
+		@Override
+		public void doReload() {
+		}
+	}
 
 	private boolean targetingUs(String configurationTarget) {
 		return targetMatcher.match(configurationTarget, target);
 	}
-
+	
+	public void loadClassConfig(ConfigurationWatcher watcher) {
+		loadClassConfig(watcher, new NullReload());
+	}
+	
 	public void loadClassConfig(ConfigurationWatcher watcher, final Reload reload) {
 		this.reload = reload;
 		watcher.configurationNotify(this);
@@ -138,9 +148,19 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 	
 	public PatternMethodConfig configFor(CtMethod method) {
 		String rootMethod = method.getDeclaringClass().getName() +  "." + method.getName();
+		if(showMethodRules) {
+			LOG.output("------------------------------------------------------------------");
+			LOG.output("Getting rule for {}", rootMethod);
+		}
 		PatternMethodConfig config = configFor(method.getDeclaringClass(), method, rootMethod, false);
 		if(!config.allowed) {
-			return configForInterfaces(method.getDeclaringClass(), method, rootMethod);
+			PatternMethodConfig interfaceConfig = configForInterfaces(method.getDeclaringClass(), method, rootMethod);
+			if(interfaceConfig.allowed) {
+				config = interfaceConfig; // otherwise the first one was the good one.
+			}
+		}
+		if(showMethodRules) {
+			LOG.output("-> returning {}", config);
 		}
 		return config;
 	}
@@ -182,6 +202,7 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		boolean foundOn = false;
 		boolean foundOff = false;
 		PatternMethodConfig foundOnConfig = allowedConfig;
+		PatternMethodConfig foundOffConfig = notAllowedConfig;
 		
 		for(PatternMethodConfig config : perClassConfigs) {
 			if(isInterface) {
@@ -193,9 +214,9 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 				if(config.isAllowed()) {
 					if(showMethodRules) {
 						if(rootMethod.equals(methodName)) {
-							LOG.info("RULE: {} ON by rule {}", rootMethod, config.className);
+							LOG.output("RULE: {} ON by rule {}, threshold:{}", rootMethod, config.className, (config.threshold == -1 ? "[DEFAULT]" : config.threshold));
 						} else {
-							LOG.info("RULE: {} ON by interface method[{}] rule {}", rootMethod, methodName, config.className);
+							LOG.output("RULE: {} ON by interface method[{}] rule {}, threshold:{}", rootMethod, methodName, config.className, (config.threshold == -1 ? "[DEFAULT]" : config.threshold));
 						}
 					}
 					foundOn = true;
@@ -203,12 +224,13 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 				} else {
 					if(showMethodRules) {
 						if(rootMethod.equals(methodName)) {
-							LOG.info("RULE: {} OFF by rule {}", rootMethod, config.className);
+							LOG.output("RULE: {} OFF by rule {}", rootMethod, config.className);
 						} else {
-							LOG.info("RULE: {} OFF by interface method[{}] and rule {}", rootMethod, methodName, config.className);
+							LOG.output("RULE: {} OFF by interface method[{}] and rule {}", rootMethod, methodName, config.className);
 						}
 					}
 					foundOff = true;
+					foundOffConfig = config;
 				}
 			}
 		}
@@ -216,11 +238,11 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		// default off : 1 on and 0 off is on, otherwise off
 		if(isDefaultOn()) { // default on : 1 off and no on we are off, otherwise on
 			if(foundOff && !foundOn) {
-				return notAllowedConfig;
+				return foundOffConfig;
 			}
 			return foundOn ? foundOnConfig : allowedConfig;
 		} else { // default off : 
-			return foundOn && !foundOff ? foundOnConfig : notAllowedConfig;
+			return foundOn && !foundOff ? foundOnConfig : foundOffConfig;
 		}
 	}
 

@@ -43,7 +43,11 @@ public abstract class AbstractConfigurationWatcher implements ConfigurationWatch
 
 	@Override
 	public void start() {
-		watchService.submit(this);
+		if(secondsBetweenPolls == NO_POLL) { // no polling - run it once and no watcher.
+			doStart();
+		} else {
+			watchService.submit(this);
+		}
 	}
 	
 	public void stop() {

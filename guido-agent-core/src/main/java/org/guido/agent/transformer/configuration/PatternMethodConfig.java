@@ -18,9 +18,9 @@ public class PatternMethodConfig {
 	public boolean isInterface() {return isInterface;}
 	public String toString() {
 		return "<allowed=" + allowed 
-				+ ", threshold=" + threshold 
-				+ ",path=" + className 
-				+ "isInterace=" + isInterface
+				+ ",threshold=" + (threshold == -1 ? "[DEFAULT]"  : threshold)
+				+ ",path=" + (className == null ? "<default-off>" : className)
+				+ ",isInterace=" + isInterface
 				+ ">";
 	}
 }

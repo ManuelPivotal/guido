@@ -12,7 +12,7 @@ public class CanReadGithubConfiguration {
 		AbstractConfigurationWatcher watcher = new GithubConfigurationWatcher(
 				"https://api.github.com/repos/ManuelPivotal/guido/contents/guido-conf/guido.conf?ref=develop", 
 				"ManuelPivofion",
-				"Fauchelevent001",
+				"wrongpass",
 				10);
 		watcher.configurationNotify(new TestNotify());
 		watcher.start();

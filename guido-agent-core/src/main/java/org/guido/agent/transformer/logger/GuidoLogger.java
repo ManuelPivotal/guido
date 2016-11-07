@@ -12,9 +12,11 @@ public class GuidoLogger {
 	static final public int DEBUG = 0;
 	static final public int INFO = 1;
 	static final public int ERROR = 2;
+	
+	static final public int OUTPUT = 10;
 
 	static final String DEBUG_LEVEL = "DEBUG";
-	static final String INFO_LEVEL = "INFO";
+	static final String INFO_LEVEL  = "INFO";
 	static final String ERROR_LEVEL = "ERROR";
 
 	private String name;
@@ -28,9 +30,9 @@ public class GuidoLogger {
 	public static void setGlobalLogLevel(String level) {
 		if(level != null) {
 			level = level.toUpperCase();
-			if(DEBUG_LEVEL.equals(level)) {globalLogLevel = DEBUG;}
-			if(INFO_LEVEL.equals(level)) {globalLogLevel = INFO;}
-			if(ERROR_LEVEL.equals(level)) {globalLogLevel = ERROR;}
+			if(DEBUG_LEVEL.equals(level)) {setGlobalLogLevel(DEBUG);}
+			if(INFO_LEVEL.equals(level))  {setGlobalLogLevel(INFO);}
+			if(ERROR_LEVEL.equals(level)) {setGlobalLogLevel(ERROR);}
 		}
 	}
 	
@@ -42,6 +44,11 @@ public class GuidoLogger {
 		return new GuidoLogger(name);
 	}
 
+	public void output(String format, Object...objects) {
+		String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
+		System.out.println(formattedMessage);
+	}
+	
 	public void debug(String format, Object...objects) {
 		if(DEBUG >= globalLogLevel) {
 			String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
@@ -50,7 +57,7 @@ public class GuidoLogger {
 	}
 
 	public void info(String format, Object...objects) {
-		if(INFO > globalLogLevel) {
+		if(INFO >= globalLogLevel) {
 			String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
 			dumpOut(INFO_LEVEL, formattedMessage);
 		}
@@ -61,7 +68,7 @@ public class GuidoLogger {
 	}
 
 	public void error(Throwable throwable, String format, Object...objects) {
-		if(ERROR > globalLogLevel) {
+		if(ERROR >= globalLogLevel) {
 			String formattedMessage = MessageFormatter.arrayFormat(format, objects).getMessage();
 			dumpOut(ERROR_LEVEL, formattedMessage, throwable);
 		}
@@ -93,5 +100,9 @@ public class GuidoLogger {
 
 	public static GuidoLogger getLogger(Class<?> clazz) {
 		return getLogger(clazz.getSimpleName());
+	}
+
+	public boolean isDebugEnabled() {
+		return globalLogLevel == DEBUG;
 	}
 }

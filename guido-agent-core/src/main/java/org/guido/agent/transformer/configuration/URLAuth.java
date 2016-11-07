@@ -3,9 +3,9 @@ package org.guido.agent.transformer.configuration;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.Base64;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.util.Base64;
 
 class URLAuth  {
 	private static final int CONNECT_TIMEOUT = 15000;
@@ -34,13 +34,13 @@ class URLAuth  {
 			if(lastAt != -1) {
 				int urlStartIndex = httpUrl.indexOf("://");
 				String credentials = httpUrl.substring(urlStartIndex + 3, lastAt);
-				urlAuth.base64Credentials = new String(Base64.getEncoder().encode(credentials.getBytes()));
+				urlAuth.base64Credentials = new String(Base64.encodeBase64(credentials.getBytes()));
 				urlAuth.displayableUrl = httpUrl.replace(credentials + "@", hidePassword(credentials) + "@");
 				httpUrl = httpUrl.replace(credentials + "@", "");
 			}
 		} else if(userName != null && password != null) {
 			String credentials = userName + ":" + password;
-			urlAuth.base64Credentials = new String(Base64.getEncoder().encode(credentials.getBytes()));
+			urlAuth.base64Credentials = new String(Base64.encodeBase64(credentials.getBytes()));
 		}
 		LOG.info("URL is {}", urlAuth.displayableUrl);
 		new URL(httpUrl); // will throw an exception if malformed

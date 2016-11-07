@@ -9,9 +9,9 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
-import java.util.Base64;
 
 import org.guido.agent.transformer.logger.GuidoLogger;
+import org.guido.util.Base64;
 
 import oss.guido.com.fasterxml.jackson.core.JsonParser;
 import oss.guido.com.fasterxml.jackson.core.JsonProcessingException;
@@ -21,7 +21,6 @@ import oss.guido.com.fasterxml.jackson.databind.JsonNode;
 import oss.guido.com.fasterxml.jackson.databind.ObjectMapper;
 import oss.guido.com.fasterxml.jackson.databind.annotation.JsonDeserialize;
 import oss.guido.com.fasterxml.jackson.databind.deser.std.StdDeserializer;
-import oss.guido.com.fasterxml.jackson.databind.exc.InvalidFormatException;
 import oss.guido.com.fasterxml.jackson.databind.module.SimpleModule;
 
 public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
@@ -46,7 +45,7 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 		}
 
 		public String configurationContent() {
-			return new String(Base64.getDecoder().decode(content.getBytes()));
+			return new String(Base64.decodeBase64(content.getBytes()));
 		}
 	}
 	

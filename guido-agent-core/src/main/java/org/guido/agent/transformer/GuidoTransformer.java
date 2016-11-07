@@ -68,7 +68,7 @@ import oss.guido.org.slf4j.MDC;
 public class GuidoTransformer implements ClassFileTransformer {
 	
 	private Logger LOG;
-	private GuidoLogger guidoLOG = GuidoLogger.getLogger("GuidoTransformer");
+	static private GuidoLogger guidoLOG = GuidoLogger.getLogger("GuidoTransformer");
 	
 	List<String> addedClassLoader = new ArrayList<String>();
 	ClassPool pool;
@@ -99,6 +99,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	
 	public GuidoTransformer() {
 		setGlobalLogLevel();
+		getIncludedPackaged();
 		getExtraProps();
 		getTraceFlag();
 		createClassConfigurer();
@@ -112,6 +113,20 @@ public class GuidoTransformer implements ClassFileTransformer {
 		startMemoryStats();
 	}
 	
+	static List<String> rootPackages = new ArrayList<String>();
+	
+	private void getIncludedPackaged() {
+		guidoLOG.debug("Getting included packages");
+		String packages = PropsUtil.getPropOrEnv("guido.packageRoots");
+		if(packages != null) {
+			String[] prefixes = packages.split(",");
+			for(String prefix : prefixes) {
+				rootPackages.add(prefix.trim() + '.');
+			}
+		}
+		guidoLOG.debug("root packages are {}", rootPackages);
+	}
+
 	private void setGlobalLogLevel() {
 		GuidoLogger.setGlobalLogLevel(getPropOrEnv("guido.logLevel", "error"));
 	}
@@ -449,46 +464,50 @@ public class GuidoTransformer implements ClassFileTransformer {
 			if(loader == null || className == null) {
 				return null;
 			}
-
+			
+			String javaClassName = className.replaceAll("/", ".");
+			if(!isObservableByName(javaClassName)) {
+				return null;
+			}
+			
 			ClassPool newPool = new ClassPool(ClassPool.getDefault());
 			newPool.insertClassPath(new LoaderClassPath(loader));
-
-			addLoaderToPool(loader, protectionDomain);
-			
 			newPool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
 			CtClass cclass = null;
 			
 			try {
 				cclass = newPool.get(className.replaceAll("/", "."));
 			} catch(Exception e) {
+				//guidoLOG.error(e, "class {} not found, loader {}", className, loader);
 				return null;
 			}
 			
-			if(isClassLoader(cclass)) {
-				return null; //createHook(cclass);
+			if(isFrozenOrClassLoader(cclass)) {
+				return null;
 			}
 			
-			if(isObservableByName(cclass)) {
-				boolean changed = false;
-				for(CtMethod method : cclass.getDeclaredMethods()) {
-					if(!method.isEmpty()) {
-						if(isElligeable(cclass, method)) {
-							try {
-								int index = createReference(method);
-								PatternMethodConfig config = classConfigurer.configFor(method);
-								updateReference(index, config);
-								method.insertBefore(insertBefore(index));
-								method.insertAfter(insertAfter());
-								CtClass etype = pool.get("java.lang.Throwable");
-								method.addCatch(addCatch(), etype);
-								changed = true;
-							} catch(Exception e) {
-								guidoLOG.info("Cannot transform {} - probably missing dependencies", method.getLongName());
-							}
+			if(guidoLOG.isDebugEnabled()) {
+				guidoLOG.output("{} loads {}", loader.getClass(), cclass.getName());
+			}
+			boolean changed = false;
+			for(CtMethod method : cclass.getDeclaredMethods()) {
+				if(!method.isEmpty()) {
+					if(isElligeable(cclass, method)) {
+						try {
+							int index = createReference(method);
+							PatternMethodConfig config = classConfigurer.configFor(method);
+							updateReference(index, config);
+							method.insertBefore(insertBefore(index));
+							method.insertAfter(insertAfter());
+							CtClass etype = pool.get("java.lang.Throwable");
+							method.addCatch(addCatch(), etype);
+							changed = true;
+						} catch(Exception e) {
+							guidoLOG.info("Cannot transform {} - probably missing dependencies", method.getLongName());
 						}
 					}
-					return changed ? cclass.toBytecode() : null;
 				}
+				return changed ? cclass.toBytecode() : null;
 			}
 			cclass.detach();
 		} catch(Exception e) {
@@ -504,7 +523,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		reference[REF_THRESHOLD] = (configThreshold == -1 ? threshold : configThreshold);
 	}
 
-	private boolean isElligeable(CtClass cclass, CtMethod method) {
+	static public boolean isElligeable(CtClass cclass, CtMethod method) {
 		if(cclass.isInterface() || cclass.isEnum() || cclass.isAnnotation()) {
 			return false;
 		}
@@ -568,13 +587,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return params;
 	}
 	
-	private boolean isClassLoader(CtClass cclass) {
+	public static boolean isFrozenOrClassLoader(CtClass cclass) {
 		if(cclass.isFrozen()) {
-			return false;
+			return true;
 		}
+		String parentClass = cclass.getName();
 		try {
 			String classLoader = ClassLoader.class.getCanonicalName();
-			String parentClass = cclass.getName();
 			while(cclass != null) {
 				String className = cclass.getName();
 				if(classLoader.equals(className)) {
@@ -584,34 +603,42 @@ public class GuidoTransformer implements ClassFileTransformer {
 				cclass = cclass.getSuperclass();
 			}
 		} catch(Exception e) {
-			guidoLOG.error(e, "Cannot check class {}", cclass.getName());
-			return false;
+			guidoLOG.error(e, "Cannot check class {}", parentClass);
+			return true;
 		}
 		return false;
 	}
 	
-	String forbiddenStarts[] = new String[] {
-			"java/", 
-			"javax/", 
-			"sun/", 
-			"com/sun/", 
-			"org/guido/", 
-			"oss/guido/",
-			"java.", 
-			"javax.", 
-			"sun.", 
-			"com.sun.", 
+	static private String forbiddenStarts[] = new String[] {
+	    	"com.sun.",
+	    	"java.",
+	    	"javax.",
+	    	"org.ietf.",
+	    	"org.jcp.",
+	    	"org.omg.",
+	    	"org.w3c.",
+	    	"org.xml.",
+	    	"sun.",
+	    	"com.oracle.",
+	    	"jdk.",
+	    	"oracle.",
+	    	"javafx.",
 			"org.guido.",
-			"oss.guido."
-			};
+			"oss.guido.",
+			"javaslang."
+	};
 	
-	private boolean isObservableByName(CtClass cclass) {
-		String className = cclass.getName();
+	static public boolean isObservableByName(String className) {
 		for(String forbiddenStart : forbiddenStarts) {
 			if(className.startsWith(forbiddenStart)) {
 				return false;
 			}
 		}
-		return true;
+		for(String rootPackage : rootPackages) {
+			if(className.startsWith(rootPackage)) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

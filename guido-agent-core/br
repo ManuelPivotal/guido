@@ -1,0 +1,7 @@
+gradle clean build fatJar -x test
+if [[ $? == 0 ]]
+then
+	./r jasper.jar
+	exit 0
+fi
+echo build error

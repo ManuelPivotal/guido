@@ -8,7 +8,11 @@ public class GuidoLoggerTest {
 	@Test
 	public void canHaveZeroOrMoreArgs() {
 		GuidoLogger logger = GuidoLogger.getLogger("TEST");
-		
+		GuidoLogger.setGlobalLogLevel(GuidoLogger.DEBUG);
+		logStuff(logger);
+	}
+
+	private void logStuff(GuidoLogger logger) {
 		logger.debug("hello, world");
 		logger.debug("hello, {}", "world");
 		logger.debug("{}, {}", "hello", "world");
@@ -17,5 +21,7 @@ public class GuidoLoggerTest {
 		
 		logger.error("error");
 		logger.error(new Exception("boom"), "error on {}", 10);
+
+		logger.info("info");
 	}
 }

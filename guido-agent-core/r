@@ -1,0 +1,18 @@
+if [[ $# != 1 ]]
+then
+	echo Usage $0 jar-file
+	exit 1
+fi
+
+CP="."
+
+for i in /Library/Tomcat/lib/*.jar
+do
+	CP="$CP:$i"
+done
+
+CP="$CP:./build/libs/guido-agent-1.0.15.jar"
+
+set -x
+java -cp $CP org.guido.agent.GuidoCheck  --hostname=home.sweet.home --conf=/Library/Tomcat/conf/guido.conf --jarfile=/Library/Tomcat/lib/tomcat-api.jar
+
