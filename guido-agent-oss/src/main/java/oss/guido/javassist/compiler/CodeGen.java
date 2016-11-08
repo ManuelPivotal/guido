@@ -19,32 +19,8 @@ package oss.guido.javassist.compiler;
 import java.util.ArrayList;
 import java.util.Arrays;
 
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.ArrayInit;
-import oss.guido.javassist.compiler.ast.AssignExpr;
-import oss.guido.javassist.compiler.ast.BinExpr;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.CastExpr;
-import oss.guido.javassist.compiler.ast.CondExpr;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.DoubleConst;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.FieldDecl;
-import oss.guido.javassist.compiler.ast.InstanceOfExpr;
-import oss.guido.javassist.compiler.ast.IntConst;
-import oss.guido.javassist.compiler.ast.Keyword;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.MethodDecl;
-import oss.guido.javassist.compiler.ast.NewExpr;
-import oss.guido.javassist.compiler.ast.Pair;
-import oss.guido.javassist.compiler.ast.Stmnt;
-import oss.guido.javassist.compiler.ast.StringL;
-import oss.guido.javassist.compiler.ast.Symbol;
-import oss.guido.javassist.compiler.ast.Variable;
-import oss.guido.javassist.compiler.ast.Visitor;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.ast.*;
 
 /* The code generator is implemeted by three files:
  * CodeGen.java, MemberCodeGen.java, and JvstCodeGen.
@@ -1445,12 +1421,13 @@ public abstract class CodeGen extends Visitor implements Opcode, TokenId {
         int type = expr.getType();
         oprand.accept(this);
         int srcType = exprType;
+        int srcDim = arrayDim;
         if (invalidDim(srcType, arrayDim, className, type, dim, name, true)
             || srcType == VOID || type == VOID)
             throw new CompileError(msg);
 
         if (type == CLASS) {
-            if (!isRefType(srcType))
+            if (!isRefType(srcType) && srcDim == 0)
                 throw new CompileError(msg);
 
             return toJvmArrayName(name, dim);

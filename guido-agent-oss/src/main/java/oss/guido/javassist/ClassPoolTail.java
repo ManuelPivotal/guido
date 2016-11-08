@@ -16,17 +16,11 @@
 
 package oss.guido.javassist;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.*;
+import java.util.jar.*;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
+import java.util.Hashtable;
 
 final class ClassPathList {
     ClassPathList next;

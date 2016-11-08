@@ -22,6 +22,9 @@ import java.io.IOException;
 import java.util.Map;
 
 import oss.guido.javassist.CannotCompileException;
+import oss.guido.javassist.bytecode.StackMapTable.InsertLocal;
+import oss.guido.javassist.bytecode.StackMapTable.NewRemover;
+import oss.guido.javassist.bytecode.StackMapTable.Shifter;
 
 /**
  * Another <code>stack_map</code> attribute defined in CLDC 1.1 for J2ME.

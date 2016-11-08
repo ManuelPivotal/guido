@@ -16,9 +16,7 @@
 
 package oss.guido.javassist.tools;
 
-import java.io.DataInputStream;
-import java.io.FileInputStream;
-import java.io.PrintWriter;
+import java.io.*;
 
 import oss.guido.javassist.bytecode.ClassFile;
 import oss.guido.javassist.bytecode.ClassFilePrinter;

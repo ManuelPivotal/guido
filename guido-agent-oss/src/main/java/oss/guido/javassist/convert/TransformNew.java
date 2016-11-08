@@ -18,12 +18,7 @@ package oss.guido.javassist.convert;
 
 import oss.guido.javassist.CannotCompileException;
 import oss.guido.javassist.CtClass;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.StackMap;
-import oss.guido.javassist.bytecode.StackMapTable;
+import oss.guido.javassist.bytecode.*;
 
 final public class TransformNew extends Transformer {
     private int nested;

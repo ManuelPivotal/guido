@@ -21,29 +21,8 @@ import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtField;
 import oss.guido.javassist.Modifier;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.ArrayInit;
-import oss.guido.javassist.compiler.ast.AssignExpr;
-import oss.guido.javassist.compiler.ast.BinExpr;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.CastExpr;
-import oss.guido.javassist.compiler.ast.CondExpr;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.DoubleConst;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.InstanceOfExpr;
-import oss.guido.javassist.compiler.ast.IntConst;
-import oss.guido.javassist.compiler.ast.Keyword;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.NewExpr;
-import oss.guido.javassist.compiler.ast.StringL;
-import oss.guido.javassist.compiler.ast.Symbol;
-import oss.guido.javassist.compiler.ast.Variable;
-import oss.guido.javassist.compiler.ast.Visitor;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.ast.*;
 
 public class TypeChecker extends Visitor implements Opcode, TokenId {
     static final String javaLangObject = "java.lang.Object";
@@ -523,7 +502,7 @@ public class TypeChecker extends Visitor implements Opcode, TokenId {
         else
             insertCast(expr, type1, type2);
 
-        if (CodeGen.isP_INT(exprType))
+        if (CodeGen.isP_INT(exprType) && exprType != BOOLEAN)
             exprType = INT;         // type1 may be BYTE, ...
     }
 

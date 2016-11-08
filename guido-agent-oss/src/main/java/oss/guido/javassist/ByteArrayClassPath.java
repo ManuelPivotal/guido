@@ -16,10 +16,9 @@
 
 package oss.guido.javassist;
 
-import java.io.ByteArrayInputStream;
-import java.io.InputStream;
-import java.net.MalformedURLException;
+import java.io.*;
 import java.net.URL;
+import java.net.MalformedURLException;
 
 /**
  * A <code>ByteArrayClassPath</code> contains bytes that is served as

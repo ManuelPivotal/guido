@@ -16,15 +16,7 @@
 
 package oss.guido.javassist;
 
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.AnnotationsAttribute;
-import oss.guido.javassist.bytecode.AttributeInfo;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.SignatureAttribute;
+import oss.guido.javassist.bytecode.*;
 import oss.guido.javassist.compiler.CompileError;
 import oss.guido.javassist.compiler.Javac;
 import oss.guido.javassist.compiler.SymbolTable;
@@ -250,19 +242,19 @@ public class CtField extends CtMember {
     }
 
     /**
-     * Returns true if the class has the specified annotation class.
+     * Returns true if the class has the specified annotation type.
      *
-     * @param clz the annotation class.
+     * @param typeName      the name of annotation type.
      * @return <code>true</code> if the annotation is found, otherwise <code>false</code>.
-     * @since 3.11
+     * @since 3.21
      */
-    public boolean hasAnnotation(Class clz) {
+    public boolean hasAnnotation(String typeName) {
         FieldInfo fi = getFieldInfo2();
         AnnotationsAttribute ainfo = (AnnotationsAttribute)
                     fi.getAttribute(AnnotationsAttribute.invisibleTag);  
         AnnotationsAttribute ainfo2 = (AnnotationsAttribute)
                     fi.getAttribute(AnnotationsAttribute.visibleTag);  
-        return CtClassType.hasAnnotationType(clz, getDeclaringClass().getClassPool(),
+        return CtClassType.hasAnnotationType(typeName, getDeclaringClass().getClassPool(),
                                              ainfo, ainfo2);
     }
 
@@ -382,6 +374,17 @@ public class CtField extends CtMember {
 
     /**
      * Sets the type of the field.
+     *
+     * <p>This method does not automatically update method bodies that access
+     * this field.  They have to be explicitly updated.  For example,
+     * if some method contains an expression {@code t.value} and the type
+     * of the variable {@code t} is changed by {@link #setType(CtClass)}
+     * from {@code int} to {@code double}, then {@code t.value} has to be modified
+     * as well since the bytecode of {@code t.value} contains the type information.
+     * </p>
+     *
+     * @see CodeConverter
+     * @see oss.guido.javassist.expr.ExprEditor
      */
     public void setType(CtClass clazz) {
         declaringClass.checkModify();

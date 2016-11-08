@@ -18,17 +18,8 @@ package oss.guido.javassist.tools.reflect;
 
 import java.util.Iterator;
 
-import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CodeConverter;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtField;
-import oss.guido.javassist.CtMethod;
+import oss.guido.javassist.*;
 import oss.guido.javassist.CtMethod.ConstParameter;
-import oss.guido.javassist.CtNewMethod;
-import oss.guido.javassist.Modifier;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.Translator;
 import oss.guido.javassist.bytecode.BadBytecode;
 import oss.guido.javassist.bytecode.ClassFile;
 import oss.guido.javassist.bytecode.MethodInfo;

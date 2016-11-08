@@ -16,28 +16,13 @@
 
 package oss.guido.javassist.bytecode;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.HashMap;
+import java.io.IOException;
+import java.io.DataInputStream;
+import java.io.ByteArrayOutputStream;
 
-import oss.guido.javassist.bytecode.annotation.Annotation;
-import oss.guido.javassist.bytecode.annotation.AnnotationMemberValue;
-import oss.guido.javassist.bytecode.annotation.AnnotationsWriter;
-import oss.guido.javassist.bytecode.annotation.ArrayMemberValue;
-import oss.guido.javassist.bytecode.annotation.BooleanMemberValue;
-import oss.guido.javassist.bytecode.annotation.ByteMemberValue;
-import oss.guido.javassist.bytecode.annotation.CharMemberValue;
-import oss.guido.javassist.bytecode.annotation.ClassMemberValue;
-import oss.guido.javassist.bytecode.annotation.DoubleMemberValue;
-import oss.guido.javassist.bytecode.annotation.EnumMemberValue;
-import oss.guido.javassist.bytecode.annotation.FloatMemberValue;
-import oss.guido.javassist.bytecode.annotation.IntegerMemberValue;
-import oss.guido.javassist.bytecode.annotation.LongMemberValue;
-import oss.guido.javassist.bytecode.annotation.MemberValue;
-import oss.guido.javassist.bytecode.annotation.ShortMemberValue;
-import oss.guido.javassist.bytecode.annotation.StringMemberValue;
+import oss.guido.javassist.bytecode.annotation.*;
 
 /**
  * A class representing
@@ -227,6 +212,32 @@ public class AnnotationsAttribute extends AttributeInfo {
         System.arraycopy(annotations, 0, newlist, 0, annotations.length);
         newlist[annotations.length] = annotation;
         setAnnotations(newlist);
+    }
+
+    /**
+     * Removes an annotation by type.
+     * After removing an annotation, if {@link #numAnnotations()} returns 0,
+     * this annotations attribute has to be removed.
+     *
+     * @param type        of annotation to remove
+     * @return whether an annotation with the given type has been removed
+     * @since 3.21
+     */
+    public boolean removeAnnotation(String type) {
+        Annotation[] annotations = getAnnotations();
+        for (int i = 0; i < annotations.length; i++) {
+            if (annotations[i].getTypeName().equals(type)) {
+                Annotation[] newlist = new Annotation[annotations.length - 1];
+                System.arraycopy(annotations, 0, newlist, 0, i);
+                if (i < annotations.length - 1) {
+                    System.arraycopy(annotations, i + 1, newlist, i,
+                                     annotations.length - i - 1);
+                }
+                setAnnotations(newlist);
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

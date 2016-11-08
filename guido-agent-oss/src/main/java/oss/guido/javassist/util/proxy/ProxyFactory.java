@@ -16,38 +16,19 @@
 
 package oss.guido.javassist.util.proxy;
 
-import java.lang.ref.WeakReference;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Member;
 import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Member;
 import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
+import java.util.*;
+import java.lang.ref.WeakReference;
 
 import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.DuplicateMemberException;
-import oss.guido.javassist.bytecode.ExceptionsAttribute;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.bytecode.StackMapTable;
+import oss.guido.javassist.NotFoundException;
+import oss.guido.javassist.bytecode.*;
 
 /*
  * This class is implemented only with the lower-level API of Javassist.
@@ -440,19 +421,20 @@ public class ProxyFactory {
     }
 
     private Class createClass1() {
-        if (thisClass == null) {
+        Class result = thisClass;
+        if (result == null) {
             ClassLoader cl = getClassLoader();
             synchronized (proxyCache) {
                 if (factoryUseCache)
                     createClass2(cl);
                 else 
                     createClass3(cl);
+
+                result = thisClass;
+                // don't retain any unwanted references
+                thisClass = null;
             }
         }
-
-        // don't retain any unwanted references
-        Class result = thisClass;
-        thisClass = null;
 
         return result;
     }
@@ -1165,22 +1147,39 @@ public class ProxyFactory {
         for (int i = 0; i < methods.length; i++)
             if (!Modifier.isPrivate(methods[i].getModifiers())) {
                 Method m = methods[i];
-                String key = m.getName() + ':' + RuntimeSupport.makeDescriptor(m);	// see keyToDesc().
+                String key = m.getName() + ':' + RuntimeSupport.makeDescriptor(m);  // see keyToDesc().
                 if (key.startsWith(HANDLER_GETTER_KEY))
                     hasGetHandler = true;
 
                 // JIRA JASSIST-85
                 // put the method to the cache, retrieve previous definition (if any) 
-                Method oldMethod = (Method)hash.put(key, methods[i]); 
+                Method oldMethod = (Method)hash.put(key, m);
+
+                // JIRA JASSIST-244
+                // ignore a bridge method with the same signature that the overridden one has.
+                if (null != oldMethod && isBridge(m)
+                    && !Modifier.isPublic(oldMethod.getDeclaringClass().getModifiers())
+                    && !Modifier.isAbstract(oldMethod.getModifiers()) && !isOverloaded(i, methods))
+                    hash.put(key, oldMethod);
 
                 // check if visibility has been reduced 
                 if (null != oldMethod && Modifier.isPublic(oldMethod.getModifiers())
-                                      && !Modifier.isPublic(methods[i].getModifiers()) ) { 
+                                      && !Modifier.isPublic(m.getModifiers())) { 
                     // we tried to overwrite a public definition with a non-public definition,
                     // use the old definition instead. 
                     hash.put(key, oldMethod); 
                 }
             }
+    }
+
+    private static boolean isOverloaded(int index, Method[] methods) {
+        String name = methods[index].getName();
+        for (int i = 0; i < methods.length; i++)
+            if (i != index)
+                if (name.equals(methods[i].getName()))
+                    return true;
+
+        return false;
     }
 
     private static final String HANDLER_GETTER_KEY
@@ -1231,7 +1230,7 @@ public class ProxyFactory {
         return minfo;
     }
 
-    private static MethodInfo makeDelegator(Method meth, String desc,
+    private MethodInfo makeDelegator(Method meth, String desc,
                 ConstPool cp, Class declClass, String delegatorName) {
         MethodInfo delegator = new MethodInfo(cp, delegatorName, desc);
         delegator.setAccessFlags(Modifier.FINAL | Modifier.PUBLIC
@@ -1244,11 +1243,27 @@ public class ProxyFactory {
         Bytecode code = new Bytecode(cp, 0, 0);
         code.addAload(0);
         int s = addLoadParameters(code, meth.getParameterTypes(), 1);
-        code.addInvokespecial(declClass.getName(), meth.getName(), desc);
+        Class targetClass = invokespecialTarget(declClass);
+        code.addInvokespecial(targetClass.isInterface(), cp.addClassInfo(targetClass.getName()),
+                              meth.getName(), desc);
         addReturn(code, meth.getReturnType());
         code.setMaxLocals(++s);
         delegator.setCodeAttribute(code.toCodeAttribute());
         return delegator;
+    }
+
+    /* Suppose that the receiver type is S, the invoked method
+     * is declared in T, and U is the immediate super class of S
+     * (or its interface).  If S <: U <: T (S <: T reads "S extends T"), 
+     * the target type of invokespecial has to be not T but U.
+     */
+    private Class invokespecialTarget(Class declClass) {
+        if (declClass.isInterface())
+            for (Class i: interfaces)
+                if (declClass.isAssignableFrom(i))
+                    return i;
+
+        return superClass;
     }
 
     /**

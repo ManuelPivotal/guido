@@ -19,9 +19,7 @@ package oss.guido.javassist.convert;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtField;
 import oss.guido.javassist.Modifier;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
+import oss.guido.javassist.bytecode.*;
 
 final public class TransformFieldAccess extends Transformer {
     private String newClassname, newFieldname;

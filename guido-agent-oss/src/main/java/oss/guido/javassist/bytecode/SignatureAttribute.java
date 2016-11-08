@@ -18,8 +18,8 @@ package oss.guido.javassist.bytecode;
 
 import java.io.DataInputStream;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Map;
+import java.util.ArrayList;
 
 import oss.guido.javassist.CtClass;
 

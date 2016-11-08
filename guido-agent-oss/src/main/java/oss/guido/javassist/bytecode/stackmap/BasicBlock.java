@@ -16,15 +16,10 @@
 
 package oss.guido.javassist.bytecode.stackmap;
 
-import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.ArrayList;
 
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ExceptionTable;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
+import oss.guido.javassist.bytecode.*;
 
 /**
  * A basic block is a sequence of bytecode that does not contain jump/branch

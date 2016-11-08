@@ -16,13 +16,13 @@
 
 package oss.guido.javassist.util.proxy;
 
+import java.lang.reflect.Method;
 import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Method;
 import java.security.ProtectionDomain;
 
 import oss.guido.javassist.CannotCompileException;

@@ -16,19 +16,9 @@
 
 package oss.guido.javassist.expr;
 
-import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.CtBehavior;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.ExceptionTable;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.compiler.CompileError;
-import oss.guido.javassist.compiler.Javac;
+import oss.guido.javassist.*;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.*;
 
 /**
  * A <code>catch</code> clause or a <code>finally</code> block.

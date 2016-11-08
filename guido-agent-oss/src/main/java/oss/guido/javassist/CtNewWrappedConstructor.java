@@ -17,9 +17,7 @@
 package oss.guido.javassist;
 
 import oss.guido.javassist.CtMethod.ConstParameter;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.Descriptor;
+import oss.guido.javassist.bytecode.*;
 
 class CtNewWrappedConstructor extends CtNewWrappedMethod {
     private static final int PASS_NONE = CtNewConstructor.PASS_NONE;

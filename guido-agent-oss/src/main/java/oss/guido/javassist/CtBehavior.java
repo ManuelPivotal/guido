@@ -16,25 +16,7 @@
 
 package oss.guido.javassist;
 
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.AnnotationsAttribute;
-import oss.guido.javassist.bytecode.AttributeInfo;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.ExceptionsAttribute;
-import oss.guido.javassist.bytecode.LineNumberAttribute;
-import oss.guido.javassist.bytecode.LocalVariableAttribute;
-import oss.guido.javassist.bytecode.LocalVariableTypeAttribute;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.bytecode.ParameterAnnotationsAttribute;
-import oss.guido.javassist.bytecode.SignatureAttribute;
-import oss.guido.javassist.bytecode.StackMap;
-import oss.guido.javassist.bytecode.StackMapTable;
+import oss.guido.javassist.bytecode.*;
 import oss.guido.javassist.compiler.CompileError;
 import oss.guido.javassist.compiler.Javac;
 import oss.guido.javassist.expr.ExprEditor;
@@ -177,20 +159,20 @@ public abstract class CtBehavior extends CtMember {
     }
 
     /**
-     * Returns true if the class has the specified annotation class.
+     * Returns true if the class has the specified annotation type.
      *
-     * @param clz the annotation class.
+     * @param typeName      the name of annotation type.
      * @return <code>true</code> if the annotation is found,
      *         otherwise <code>false</code>.
-     * @since 3.11
+     * @since 3.21
      */
-    public boolean hasAnnotation(Class clz) {
+    public boolean hasAnnotation(String typeName) {
        MethodInfo mi = getMethodInfo2();
        AnnotationsAttribute ainfo = (AnnotationsAttribute)
                    mi.getAttribute(AnnotationsAttribute.invisibleTag);  
        AnnotationsAttribute ainfo2 = (AnnotationsAttribute)
                    mi.getAttribute(AnnotationsAttribute.visibleTag);  
-       return CtClassType.hasAnnotationType(clz,
+       return CtClassType.hasAnnotationType(typeName,
                                             getDeclaringClass().getClassPool(),
                                             ainfo, ainfo2);
     }

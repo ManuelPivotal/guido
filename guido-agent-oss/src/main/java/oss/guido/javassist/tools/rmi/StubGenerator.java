@@ -19,18 +19,8 @@ package oss.guido.javassist.tools.rmi;
 import java.lang.reflect.Method;
 import java.util.Hashtable;
 
-import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtConstructor;
-import oss.guido.javassist.CtField;
-import oss.guido.javassist.CtMethod;
+import oss.guido.javassist.*;
 import oss.guido.javassist.CtMethod.ConstParameter;
-import oss.guido.javassist.CtNewConstructor;
-import oss.guido.javassist.CtNewMethod;
-import oss.guido.javassist.Modifier;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.Translator;
 
 /**
  * A stub-code generator.  It is used for producing a proxy class.

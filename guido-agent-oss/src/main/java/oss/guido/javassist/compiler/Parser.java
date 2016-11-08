@@ -16,29 +16,7 @@
 
 package oss.guido.javassist.compiler;
 
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.ArrayInit;
-import oss.guido.javassist.compiler.ast.AssignExpr;
-import oss.guido.javassist.compiler.ast.BinExpr;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.CastExpr;
-import oss.guido.javassist.compiler.ast.CondExpr;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.DoubleConst;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.FieldDecl;
-import oss.guido.javassist.compiler.ast.InstanceOfExpr;
-import oss.guido.javassist.compiler.ast.IntConst;
-import oss.guido.javassist.compiler.ast.Keyword;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.MethodDecl;
-import oss.guido.javassist.compiler.ast.NewExpr;
-import oss.guido.javassist.compiler.ast.Pair;
-import oss.guido.javassist.compiler.ast.Stmnt;
-import oss.guido.javassist.compiler.ast.StringL;
-import oss.guido.javassist.compiler.ast.Symbol;
-import oss.guido.javassist.compiler.ast.Variable;
+import oss.guido.javassist.compiler.ast.*;
 
 public final class Parser implements TokenId {
     private Lex lex;

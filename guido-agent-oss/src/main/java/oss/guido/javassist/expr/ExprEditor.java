@@ -18,12 +18,7 @@ package oss.guido.javassist.expr;
 
 import oss.guido.javassist.CannotCompileException;
 import oss.guido.javassist.CtClass;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ExceptionTable;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
+import oss.guido.javassist.bytecode.*;
 
 /**
  * A translator of method bodies.

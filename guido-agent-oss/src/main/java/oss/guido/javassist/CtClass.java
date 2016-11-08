@@ -69,7 +69,7 @@ public abstract class CtClass {
     /**
      * The version number of this release.
      */
-    public static final String version = "3.20.0-GA";
+    public static final String version = "3.21.0-GA";
 
     /**
      * Prints the version number and the copyright notice.
@@ -80,7 +80,7 @@ public abstract class CtClass {
      */
     public static void main(String[] args) {
         System.out.println("Javassist version " + CtClass.version);
-        System.out.println("Copyright (C) 1999-2015 Shigeru Chiba."
+        System.out.println("Copyright (C) 1999-2016 Shigeru Chiba."
                            + " All Rights Reserved.");
     }
 
@@ -582,24 +582,35 @@ public abstract class CtClass {
     }
 
     /**
-     * Returns true if the class has the specified annotation class.
+     * Returns true if the class has the specified annotation type.
      *
-     * @param clz the annotation class.
+     * @param annotationType the annotation type.
      * @return <code>true</code> if the annotation is found, otherwise <code>false</code>.
      * @since 3.11
      */
-    public boolean hasAnnotation(Class clz) {
+    public boolean hasAnnotation(Class annotationType) {
+        return hasAnnotation(annotationType.getName());
+    }
+
+    /**
+     * Returns true if the class has the specified annotation type.
+     *
+     * @param annotationTypeName the name of annotation type.
+     * @return <code>true</code> if the annotation is found, otherwise <code>false</code>.
+     * @since 3.21
+     */
+    public boolean hasAnnotation(String annotationTypeName) {
         return false;
     }
 
     /**
-     * Returns the annotation if the class has the specified annotation class.
+     * Returns the annotation if the class has the specified annotation type.
      * For example, if an annotation <code>@Author</code> is associated
      * with this class, an <code>Author</code> object is returned.
      * The member values can be obtained by calling methods on
      * the <code>Author</code> object.
      *
-     * @param clz the annotation class.
+     * @param clz the annotation type.
      * @return the annotation if found, otherwise <code>null</code>.
      * @since 3.11
      */

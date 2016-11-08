@@ -27,10 +27,10 @@ import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
 import java.security.ProtectionDomain;
-import java.util.ArrayList;
-import java.util.Enumeration;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.ArrayList;
+import java.util.Enumeration;
 
 import oss.guido.javassist.bytecode.ClassFile;
 import oss.guido.javassist.bytecode.Descriptor;

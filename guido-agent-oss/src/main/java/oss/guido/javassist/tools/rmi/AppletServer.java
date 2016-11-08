@@ -16,14 +16,7 @@
 
 package oss.guido.javassist.tools.rmi;
 
-import java.io.DataInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InvalidClassException;
-import java.io.NotSerializableException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.lang.reflect.Method;
 import java.util.Hashtable;
 import java.util.Vector;
@@ -31,8 +24,7 @@ import java.util.Vector;
 import oss.guido.javassist.CannotCompileException;
 import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.tools.web.BadHttpRequest;
-import oss.guido.javassist.tools.web.Webserver;
+import oss.guido.javassist.tools.web.*;
 
 /**
  * An AppletServer object is a web server that an ObjectImporter

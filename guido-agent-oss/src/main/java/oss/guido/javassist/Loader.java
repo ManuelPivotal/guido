@@ -16,10 +16,10 @@
 
 package oss.guido.javassist;
 
-import java.io.InputStream;
-import java.security.ProtectionDomain;
+import java.io.*;
 import java.util.Hashtable;
 import java.util.Vector;
+import java.security.ProtectionDomain;
 
 /**
  * The class loader for Javassist.

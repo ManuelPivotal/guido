@@ -16,17 +16,10 @@
 
 package oss.guido.javassist.tools.rmi;
 
+import java.io.*;
+import java.net.*;
 import java.applet.Applet;
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Constructor;
-import java.net.Socket;
-import java.net.URL;
+import java.lang.reflect.*;
 
 /**
  * The object importer enables applets to call a method on a remote

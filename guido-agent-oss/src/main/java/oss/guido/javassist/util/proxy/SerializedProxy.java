@@ -16,11 +16,12 @@
 
 package oss.guido.javassist.util.proxy;
 
-import java.io.ObjectStreamException;
 import java.io.Serializable;
+import java.io.ObjectStreamException;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
 import java.security.PrivilegedExceptionAction;
+import java.security.ProtectionDomain;
 
 /**
  * A proxy object is converted into an instance of this class

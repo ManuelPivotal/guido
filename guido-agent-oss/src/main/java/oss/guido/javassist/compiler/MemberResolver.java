@@ -16,26 +16,15 @@
 
 package oss.guido.javassist.compiler;
 
-import java.lang.ref.WeakReference;
 import java.util.Hashtable;
-import java.util.Iterator;
-import java.util.List;
+import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
+import java.util.List;
+import java.util.Iterator;
 
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtField;
-import oss.guido.javassist.Modifier;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.Keyword;
-import oss.guido.javassist.compiler.ast.Symbol;
+import oss.guido.javassist.*;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.ast.*;
 
 /* Code generator methods depending on javassist.* classes.
  */
@@ -115,7 +104,8 @@ public class MemberResolver implements TokenId {
             int n = list.size();
             for (int i = 0; i < n; ++i) {
                 MethodInfo minfo = (MethodInfo)list.get(i);
-                if (minfo.getName().equals(methodName)) {
+                if (minfo.getName().equals(methodName)
+                    && (minfo.getAccessFlags() & AccessFlag.BRIDGE) == 0) {
                     int res = compareSignature(minfo.getDescriptor(),
                                            argTypes, argDims, argClassNames);
                     if (res != NO) {
@@ -132,7 +122,8 @@ public class MemberResolver implements TokenId {
         if (onlyExact)
             maybe = null;
         else
-            onlyExact = maybe != null;
+            if (maybe != null)
+                return maybe;
 
         int mod = clazz.getModifiers();
         boolean isIntf = Modifier.isInterface(mod);

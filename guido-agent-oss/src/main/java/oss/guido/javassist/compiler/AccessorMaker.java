@@ -18,19 +18,8 @@ package oss.guido.javassist.compiler;
 
 import java.util.HashMap;
 
-import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.ExceptionsAttribute;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.SyntheticAttribute;
+import oss.guido.javassist.*;
+import oss.guido.javassist.bytecode.*;
 
 /**
  * AccessorMaker maintains accessors to private members of an enclosing

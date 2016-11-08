@@ -17,6 +17,7 @@
 package oss.guido.javassist.bytecode.annotation;
 
 import java.io.IOException;
+import java.lang.reflect.Array;
 import java.lang.reflect.Method;
 
 import oss.guido.javassist.ClassPool;

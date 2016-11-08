@@ -72,6 +72,8 @@ public class ControlFlow {
                 return new Block[size];
             }
         }.make(minfo);
+        if (basicBlocks == null)
+            basicBlocks = new Block[0];
         int size = basicBlocks.length;
         int[] counters = new int[size];
         for (int i = 0; i < size; i++) {
@@ -98,6 +100,9 @@ public class ControlFlow {
 
     /**
      * Returns all the basic blocks in the method body.
+     *
+     * @return an array of basic blocks, the array has length 0 if
+     * the method doesn't have code.
      */
     public Block[] basicBlocks() {
         return basicBlocks;
@@ -134,7 +139,7 @@ public class ControlFlow {
      * For every array element <code>node</code>, its index in the
      * array is equivalent to <code>node.block().index()</code>. 
      *
-     * @return an array of the tree nodes, or null if the method is abstract.
+     * @return an array of the tree nodes, or null if the method doesn't have code.
      * @see Node#block()
      * @see Block#index()
      */
@@ -180,7 +185,7 @@ public class ControlFlow {
      * For every array element <code>node</code>, its index in the
      * array is equivalent to <code>node.block().index()</code>.
      *
-     * @return an array of the tree nodes, or null if the method is abstract.
+     * @return an array of the tree nodes, or null if the method doesn't have code.
      * @see Node#block()
      * @see Block#index()
      */

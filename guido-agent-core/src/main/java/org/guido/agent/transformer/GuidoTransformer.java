@@ -1,11 +1,8 @@
 package org.guido.agent.transformer;
 
-import static org.guido.agent.transformer.interceptor.GuidoInterceptor.addCatch;
-import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertAfter;
-import static org.guido.agent.transformer.interceptor.GuidoInterceptor.insertBefore;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_ALLOWED;
-import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_CLASS_NAME;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_COUNT;
+import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_LONG_NAME;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_SIGNATURE;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.TOTAL_REF;
@@ -14,6 +11,7 @@ import static org.guido.util.PropsUtil.getPropOrEnvBoolean;
 
 import java.lang.instrument.ClassFileTransformer;
 import java.lang.instrument.IllegalClassFormatException;
+import java.lang.reflect.Modifier;
 import java.security.ProtectionDomain;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
@@ -42,8 +40,8 @@ import org.guido.agent.transformer.configuration.PatternMethodConfig;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
+import org.guido.agent.transformer.interceptor.ReferenceIndex;
 import org.guido.agent.transformer.logger.GuidoLogger;
-import org.guido.util.ExceptionUtil;
 import org.guido.util.PropsUtil;
 import org.guido.util.ThreadExecutorUtils;
 
@@ -55,12 +53,10 @@ import oss.guido.ch.qos.logback.core.Appender;
 import oss.guido.ch.qos.logback.core.ConsoleAppender;
 import oss.guido.ch.qos.logback.core.util.Duration;
 import oss.guido.javassist.ByteArrayClassPath;
-import oss.guido.javassist.CannotCompileException;
 import oss.guido.javassist.ClassPool;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.LoaderClassPath;
-import oss.guido.javassist.NotFoundException;
 import oss.guido.net.logstash.logback.appender.LoggingEventAsyncDisruptorAppender;
 import oss.guido.net.logstash.logback.appender.LogstashTcpSocketAppender;
 import oss.guido.org.slf4j.MDC;
@@ -70,11 +66,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 	private Logger LOG;
 	static private GuidoLogger guidoLOG = GuidoLogger.getLogger("GuidoTransformer");
 	
-	List<String> addedClassLoader = new ArrayList<String>();
 	ClassPool pool;
+	//CtClass etype = pool.get("java.lang.Throwable");
 	LinkedBlockingDeque<Object[]> queue = new LinkedBlockingDeque<Object[]>(8192);
-	List<Object[]> references = new ArrayList<Object[]>(32 * 1024);
-	List<CtMethod> methods = new ArrayList<CtMethod>(32 * 1024);
+	Map<Integer, Object[]> references = new HashMap<Integer, Object[]>(32 * 1024);
+
 	Map<String, String> extraProps = new HashMap<String, String>();
 	private long threshold;
 	private PatternMethodConfigurer classConfigurer;
@@ -113,7 +109,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		startMemoryStats();
 	}
 	
-	static List<String> rootPackages = new ArrayList<String>();
+	static List<String> packageRoots = new ArrayList<String>();
 	
 	private void getIncludedPackaged() {
 		guidoLOG.debug("Getting included packages");
@@ -121,10 +117,10 @@ public class GuidoTransformer implements ClassFileTransformer {
 		if(packages != null) {
 			String[] prefixes = packages.split(",");
 			for(String prefix : prefixes) {
-				rootPackages.add(prefix.trim() + '.');
+				packageRoots.add(prefix.trim() + '.');
 			}
 		}
-		guidoLOG.debug("root packages are {}", rootPackages);
+		guidoLOG.debug("root packages are {}", packageRoots);
 	}
 
 	private void setGlobalLogLevel() {
@@ -249,15 +245,15 @@ public class GuidoTransformer implements ClassFileTransformer {
 		guidoLOG.info("Start modifying class definitions");
 		int totalChanged = 0;
 		synchronized(references) {
-			for(int index = 0; index < methods.size(); index++) {
-				PatternMethodConfig newConfig = classConfigurer.configFor(methods.get(index));
-				if(isReferenceDifferent(index, newConfig)) {
-					updateReference(index, newConfig);
+			for(Entry<Integer, Object[]> entry : references.entrySet()) {
+				PatternMethodConfig newConfig = classConfigurer.configFor((String)(entry.getValue()[REF_LONG_NAME]));
+				if(isReferenceDifferent(entry.getKey(), newConfig)) {
+					updateReference(entry.getKey(), newConfig);
 					totalChanged++;
 				}
 			}
 		}
-		guidoLOG.info("Method definitions modified - " + totalChanged + "/" + methods.size() + " method(s) modified");
+		guidoLOG.info("Method definitions modified - " + totalChanged + "/" + references.size() + " method(s) modified");
 	}
 
 	private boolean isReferenceDifferent(int index, PatternMethodConfig newConfig) {
@@ -354,31 +350,28 @@ public class GuidoTransformer implements ClassFileTransformer {
 		GuidoInterceptor.extraProps = extraProps;
 	}
 	
-	private int createReference(CtMethod method) {
-		int referenceNumber;
+	int referenceNumber = 0;
+	
+	private int createReference(String methodName) {
+		int ref = methodName.hashCode();
 		synchronized(references) {
-			references.add(newMethodReference(method));
-			methods.add(method);
-			referenceNumber = references.size() - 1;
+			references.put(ref, newMethodReference(methodName));
 		}
-		return referenceNumber;
+		return ref;
 	}
 	
-	private Object[] newMethodReference(CtMethod method) {
+	private Object[] newMethodReference(String methodName) {
 		Object[] ref = new Object[TOTAL_REF];
-		String name = method.getDeclaringClass().getName() + "." + method.getName();
-		name = name.replaceAll("\\$", "-");
 
 		ref[REF_ALLOWED] = true;
-		ref[REF_CLASS_NAME] = method.getDeclaringClass().getSimpleName();
-		ref[REF_SHORT_SIGNATURE] = name; //method.getDeclaringClass().getName() + "." + method.getName();
+		ref[REF_SHORT_SIGNATURE] = methodName.replaceAll("\\$", "-");
 		ref[REF_THRESHOLD] = threshold;
 		ref[REF_COUNT] = (long)0;
+		ref[REF_LONG_NAME] = methodName;
 		return ref;
 	}
 	
 	ExecutorService qTransformerExecutor = ThreadExecutorUtils.newFixedThreadPool(10);
-
 	
 	class LOGQListener implements Runnable {
 		@Override
@@ -416,11 +409,11 @@ public class GuidoTransformer implements ClassFileTransformer {
 				try {
 					Thread.sleep(30 * 1000);
 					Statistics stats = logRate.getStatistics();
-					guidoLOG.info("{[sent={}]}", df.format(stats.getCountLong()));
+					guidoLOG.output("{[sent={}]}", df.format(stats.getCountLong()));
 					int total = 0;
 					int totalOn = 0;
 					int totalOff = 0;
-					for(Object[] ref : references) {
+					for(Object[] ref : references.values()) {
 						if((boolean)ref[REF_ALLOWED]) {
 							totalOn++;
 						} else {
@@ -428,7 +421,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 						}
 						total++;
 					}
-					guidoLOG.info("Total method is {}, {} on, {} off",
+					guidoLOG.output("Total method is {}, {} on, {} off",
 							total, 
 							totalOn,
 							totalOff);
@@ -458,62 +451,87 @@ public class GuidoTransformer implements ClassFileTransformer {
 								Class<?> classBeingRedefined, 
 								ProtectionDomain protectionDomain,
 								byte[] classfileBuffer) throws IllegalClassFormatException {
-		try {
 			// A null loader means the bootstrap loader.
 			// We do not instrument classes loaded by the bootstrap loader nor unnamed classes
-			if(loader == null || className == null) {
-				return null;
-			}
-			
-			String javaClassName = className.replaceAll("/", ".");
-			if(!isObservableByName(javaClassName)) {
-				return null;
-			}
-			
-			ClassPool newPool = new ClassPool(ClassPool.getDefault());
-			newPool.insertClassPath(new LoaderClassPath(loader));
-			newPool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
-			CtClass cclass = null;
-			
-			try {
-				cclass = newPool.get(className.replaceAll("/", "."));
-			} catch(Exception e) {
-				//guidoLOG.error(e, "class {} not found, loader {}", className, loader);
-				return null;
-			}
-			
-			if(isFrozenOrClassLoader(cclass)) {
-				return null;
-			}
-			
-			if(guidoLOG.isDebugEnabled()) {
-				guidoLOG.output("{} loads {}", loader.getClass(), cclass.getName());
-			}
+		if(loader == null || className == null) {
+			return null;
+		}
+
+		String javaClassName = className.replaceAll("/", ".");
+		if(!isObservableByName(javaClassName)) {
+			return null;
+		}
+		
+		CtClass cclass = getObjectClass(loader, javaClassName, classfileBuffer, protectionDomain);
+		
+		if(cclass == null) {
+			return null;
+		}
+		
+		try {
 			boolean changed = false;
 			for(CtMethod method : cclass.getDeclaredMethods()) {
-				if(!method.isEmpty()) {
-					if(isElligeable(cclass, method)) {
-						try {
-							int index = createReference(method);
-							PatternMethodConfig config = classConfigurer.configFor(method);
-							updateReference(index, config);
-							method.insertBefore(insertBefore(index));
-							method.insertAfter(insertAfter());
-							CtClass etype = pool.get("java.lang.Throwable");
-							method.addCatch(addCatch(), etype);
-							changed = true;
-						} catch(Exception e) {
-							guidoLOG.info("Cannot transform {} - probably missing dependencies", method.getLongName());
-						}
+				int methodModifier = method.getModifiers();
+				if(Modifier.isAbstract(methodModifier) 
+					|| Modifier.isNative(methodModifier)) 
+				{
+					if(guidoLOG.isDebugEnabled()) {
+						guidoLOG.debug("Cannot intrument {}, incorect modifier {}", 
+									cclass.getName() + '.' + method.getName(), 
+									methodModifier);
 					}
+					continue;
 				}
-				return changed ? cclass.toBytecode() : null;
+				try {
+					String methodName = cclass.getName() + '.' + method.getName();
+					int index = createReference(methodName);
+					PatternMethodConfig config = classConfigurer.configFor(methodName);
+					updateReference(index, config);
+					method.insertBefore(GuidoInterceptor.insertBefore(index));
+					method.insertAfter(GuidoInterceptor.insertAfter());
+					CtClass etype = pool.get("java.lang.Throwable");
+					method.addCatch(GuidoInterceptor.addCatch(), etype);
+					changed = true;
+				} catch(Exception e) {
+					guidoLOG.debug("Exception 1 while transforming {}", method.getLongName());
+					return null;
+				}
 			}
-			cclass.detach();
+			guidoLOG.debug("instrumented {}",  cclass.getName());
+			return changed ? cclass.toBytecode() : null;
 		} catch(Exception e) {
-			guidoLOG.error(e, "Error while transforming {}", e);
+			guidoLOG.debug("exception 2 while transforming {}", cclass.getName());
+		} finally {
+			if(cclass != null) {
+				cclass.detach();
+			}
 		}
 		return null;
+	}
+	
+	private CtClass getObjectClass(ClassLoader loader, String className, byte[] classfileBuffer, ProtectionDomain protectionDomain) {
+		ClassPool newPool = createNewPool(loader, className, classfileBuffer);
+		CtClass cclass = null;
+		try {
+			cclass = newPool.get(className);
+			if(isFrozenOrClassLoader(cclass) 
+					|| cclass.isInterface()
+					|| cclass.isAnnotation()
+					) { 
+				guidoLOG.debug("{} is a classloader, interface or annotation - ignored.", className);
+				return null;
+			}
+			return cclass;
+		} catch(Exception e) {
+			return null;
+		}
+	}
+
+	private ClassPool createNewPool(ClassLoader loader, String className, byte[] classfileBuffer) {
+		ClassPool newPool = new ClassPool(ClassPool.getDefault());
+		newPool.insertClassPath(new LoaderClassPath(loader));
+		newPool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
+		return newPool;
 	}
 
 	private void updateReference(int index, PatternMethodConfig config) {
@@ -530,63 +548,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return true;
 	}
 
-	private void addLoaderToPool(ClassLoader loader, ProtectionDomain protectionDomain) {
-		String loaderClass = loader.getClass().getCanonicalName();
-		if(!loaderClass.contains("DelegatingClassLoader")) {
-			String signature = String.valueOf(loader.hashCode());
-			if(!addedClassLoader.contains(signature)) {
-				guidoLOG.debug("Adding new class loader of {} signature [{}]", loaderClass, signature);
-				addedClassLoader.add(signature);
-				//pool.insertClassPath(new LoaderClassPath(loader));
-				forceGuidoClassesToLoader(loader, protectionDomain);
-			}
-		}
-	}
-
-	private void forceGuidoClassesToLoader(ClassLoader loader, ProtectionDomain protectionDomain) {
-		String loaderClass = loader.getClass().getCanonicalName();
-		String binaryName = GuidoInterceptor.class.getCanonicalName().replaceAll("\\.", "/");
-		guidoLOG.debug(String.format("@@@@ checking %s in %s", binaryName, loaderClass));
-		try {
-			loader.loadClass(binaryName);
-			guidoLOG.debug("@@@@ " + binaryName + " exists in " + loaderClass);
-			return;
-		} catch(Throwable e) {
-			guidoLOG.debug("@@@@ " + binaryName + " does not exist in " + loaderClass);
-		}
-		guidoLOG.debug("@@@@ forcing load of Guido classes by {}", loaderClass);
-		try {
-			for(Class<?> clazz : GuidoInterceptor.toLoad) {
-				CtClass guidoClass = pool.get(clazz.getCanonicalName());
-				guidoClass.toClass(loader, protectionDomain);
-			}
-			CtClass interceptorCtClass = pool.get(GuidoInterceptor.class.getCanonicalName());
-			Class<?> interceptorClass = interceptorCtClass.toClass(loader, protectionDomain);
-			Map<String, Object> params = buildConstructorArg();
-			interceptorClass.getDeclaredConstructor(Object.class).newInstance(params);
-		} catch(Exception e) {
-			Throwable rootCause = ExceptionUtil.getRootCause(e);
-			if(rootCause instanceof NotFoundException || rootCause instanceof LinkageError || rootCause instanceof CannotCompileException) {
-				return;
-			}
-			return;
-			// guidoLOG.error(e, "cannot force {} to load guido classes.", loader.getClass()); 
-		} catch(LinkageError le) {
-			// already in the class loader space
-		}
-		guidoLOG.debug("@@@@ forcing load of Guido classes done.");
-	}
-
-	private Map<String, Object> buildConstructorArg() {
-		Map<String, Object> params = new HashMap<String, Object>();
-		params.put("refs", GuidoInterceptor.references);
-		params.put("logQ", queue);
-		params.put("pid", GuidoInterceptor.pid);
-		params.put("threshold", GuidoInterceptor.threshold);
-		params.put("extraprops", GuidoInterceptor.extraProps);
-		return params;
-	}
-	
 	public static boolean isFrozenOrClassLoader(CtClass cclass) {
 		if(cclass.isFrozen()) {
 			return true;
@@ -597,7 +558,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 			while(cclass != null) {
 				String className = cclass.getName();
 				if(classLoader.equals(className)) {
-					guidoLOG.debug(parentClass + " is a ClassLoader");
+					// guidoLOG.debug(parentClass + " is a ClassLoader");
 					return true;
 				}
 				cclass = cclass.getSuperclass();
@@ -625,8 +586,15 @@ public class GuidoTransformer implements ClassFileTransformer {
 	    	"javafx.",
 			"org.guido.",
 			"oss.guido.",
-			"javaslang."
+			"javaslang.",
+			"org.springframework."
 	};
+	
+	static public String[] forbidenContents = new String[] {
+		"CGLIB" // CGLIB induces VerifyError combined with Javassist.
+	};
+	
+	static boolean ignorePackageRoot = PropsUtil.getPropOrEnvBoolean("guido.ignorepackageRoots", false);
 	
 	static public boolean isObservableByName(String className) {
 		for(String forbiddenStart : forbiddenStarts) {
@@ -634,7 +602,15 @@ public class GuidoTransformer implements ClassFileTransformer {
 				return false;
 			}
 		}
-		for(String rootPackage : rootPackages) {
+		for(String forbidenContent : forbidenContents) {
+			if(className.contains(forbidenContent)) {
+				return false;
+			}
+		}
+		if(ignorePackageRoot) {
+			return true;
+		}
+		for(String rootPackage : packageRoots) {
 			if(className.startsWith(rootPackage)) {
 				return true;
 			}

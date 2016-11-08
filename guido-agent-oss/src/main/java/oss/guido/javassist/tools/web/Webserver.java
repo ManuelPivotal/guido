@@ -16,23 +16,11 @@
 
 package oss.guido.javassist.tools.web;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.ServerSocket;
-import java.net.Socket;
+import java.net.*;
+import java.io.*;
 import java.util.Date;
 
-import oss.guido.javassist.CannotCompileException;
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.Translator;
+import oss.guido.javassist.*;
 
 /**
  * A web server for running sample programs.

@@ -18,8 +18,7 @@ package oss.guido.javassist.convert;
 
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeIterator;
+import oss.guido.javassist.bytecode.*;
 
 public class TransformAfter extends TransformBefore {
     public TransformAfter(Transformer next,

@@ -16,11 +16,11 @@
 
 package oss.guido.javassist.bytecode;
 
-import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
-import java.io.IOException;
+import java.io.ByteArrayOutputStream;
 import java.io.PrintWriter;
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -222,6 +222,9 @@ public final class ConstPool {
     /**
      * Returns the <code>tag</code> field of the constant pool table
      * entry at the given index.
+     *
+     * @return either <code>CONST_Class</code>, <code>CONST_Fieldref</code>,
+     *         <code>CONST_Methodref</code>, or ...  
      */
     public int getTag(int index) {
         return getItem(index).getTag();

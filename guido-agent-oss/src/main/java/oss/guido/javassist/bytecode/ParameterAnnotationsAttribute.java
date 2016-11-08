@@ -16,17 +16,16 @@
 
 package oss.guido.javassist.bytecode;
 
-import java.io.ByteArrayOutputStream;
-import java.io.DataInputStream;
-import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.IOException;
+import java.io.DataInputStream;
+import java.io.ByteArrayOutputStream;
 
 import oss.guido.javassist.bytecode.AnnotationsAttribute.Copier;
 import oss.guido.javassist.bytecode.AnnotationsAttribute.Parser;
 import oss.guido.javassist.bytecode.AnnotationsAttribute.Renamer;
-import oss.guido.javassist.bytecode.annotation.Annotation;
-import oss.guido.javassist.bytecode.annotation.AnnotationsWriter;
+import oss.guido.javassist.bytecode.annotation.*;
 
 /**
  * A class representing <code>RuntimeVisibleAnnotations_attribute</code> and

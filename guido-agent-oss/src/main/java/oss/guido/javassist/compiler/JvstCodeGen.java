@@ -16,21 +16,9 @@
 
 package oss.guido.javassist.compiler;
 
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtPrimitiveType;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.CastExpr;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.Stmnt;
-import oss.guido.javassist.compiler.ast.Symbol;
+import oss.guido.javassist.*;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.ast.*;
 
 /* Code generator accepting extended Java syntax for Javassist.
  */
@@ -100,7 +88,7 @@ public class JvstCodeGen extends MemberCodeGen {
         }
         else if (name.equals(sigName)) {
             bytecode.addLdc(Descriptor.ofMethod(returnType, paramTypeList));
-            bytecode.addInvokestatic("oss/guido/javassist/runtime/Desc", "getParams",
+            bytecode.addInvokestatic("javassist/runtime/Desc", "getParams",
                                 "(Ljava/lang/String;)[Ljava/lang/Class;");
             exprType = CLASS;
             arrayDim = 1;
@@ -125,7 +113,7 @@ public class JvstCodeGen extends MemberCodeGen {
     }
 
     private void callGetType(String method) {
-        bytecode.addInvokestatic("oss/guido/javassist/runtime/Desc", method,
+        bytecode.addInvokestatic("javassist/runtime/Desc", method,
                                 "(Ljava/lang/String;)Ljava/lang/Class;");
         exprType = CLASS;
         arrayDim = 0;
@@ -405,16 +393,15 @@ public class JvstCodeGen extends MemberCodeGen {
 
     /* called by Javac#recordSpecialProceed().
      */
-    void compileInvokeSpecial(ASTree target, String classname,
-                              String methodname, String descriptor,
-                              ASTList args)
+    void compileInvokeSpecial(ASTree target, int methodIndex,
+                              String descriptor, ASTList args)
         throws CompileError
     {
         target.accept(this);
         int nargs = getMethodArgsLength(args);
         atMethodArgs(args, new int[nargs], new int[nargs],
                      new String[nargs]);
-        bytecode.addInvokespecial(classname, methodname, descriptor);
+        bytecode.addInvokespecial(methodIndex, descriptor);
         setReturnType(descriptor, false, false);
         addNullIfVoid();
     }

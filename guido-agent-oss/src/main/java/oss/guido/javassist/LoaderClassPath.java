@@ -17,8 +17,8 @@
 package oss.guido.javassist;
 
 import java.io.InputStream;
-import java.lang.ref.WeakReference;
 import java.net.URL;
+import java.lang.ref.WeakReference;
 
 /**
  * A class search-path representing a class loader.

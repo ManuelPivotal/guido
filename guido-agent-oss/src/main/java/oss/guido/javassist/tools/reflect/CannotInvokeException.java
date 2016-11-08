@@ -17,6 +17,7 @@
 package oss.guido.javassist.tools.reflect;
 
 import java.lang.reflect.InvocationTargetException;
+import java.lang.IllegalAccessException;
 
 /**
  * Thrown when method invocation using the reflection API has thrown

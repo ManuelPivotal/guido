@@ -16,17 +16,8 @@
 
 package oss.guido.javassist.compiler;
 
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtPrimitiveType;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.CastExpr;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.Symbol;
+import oss.guido.javassist.*;
+import oss.guido.javassist.compiler.ast.*;
 
 /* Type checker accepting extended Java syntax for Javassist.
  */

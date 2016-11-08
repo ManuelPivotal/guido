@@ -19,12 +19,7 @@ package oss.guido.javassist;
 import java.util.Hashtable;
 
 import oss.guido.javassist.CtMethod.ConstParameter;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.SyntheticAttribute;
+import oss.guido.javassist.bytecode.*;
 import oss.guido.javassist.compiler.JvstCodeGen;
 
 class CtNewWrappedMethod {

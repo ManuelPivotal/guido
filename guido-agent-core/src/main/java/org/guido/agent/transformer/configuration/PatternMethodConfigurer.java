@@ -3,6 +3,7 @@ package org.guido.agent.transformer.configuration;
 import static org.guido.util.PropsUtil.toNano;
 
 import java.io.BufferedReader;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -262,5 +263,76 @@ public class PatternMethodConfigurer implements ConfigurationNotify {
 		}
 		endConfigure();
 		reload.doReload();
+	}
+
+	public PatternMethodConfig configFor(Class<?> clazz, Method method) {
+		String methodName = clazz.getName() +  "." + method.getName();
+		boolean foundOn = false;
+		boolean foundOff = false;
+		PatternMethodConfig foundOnConfig = allowedConfig;
+		PatternMethodConfig foundOffConfig = notAllowedConfig;
+
+		for(PatternMethodConfig config : perClassConfigs) {
+			if(pathMatcher.match(config.className, methodName)) {
+				if(config.isAllowed()) {
+					if(showMethodRules) {
+						LOG.output("RULE: {} ON by rule {}, threshold:{}", methodName, config.className, (config.threshold == -1 ? "[DEFAULT]" : config.threshold));
+					}
+					foundOn = true;
+					foundOnConfig = config;
+				} else {
+					if(showMethodRules) {
+						LOG.output("RULE: {} OFF by rule {}", methodName, config.className);
+					}
+					foundOff = true;
+					foundOffConfig = config;
+				}
+			}
+		}
+		// default on : 1 off and 0 on is off, otherwise on
+		// default off : 1 on and 0 off is on, otherwise off
+		if(isDefaultOn()) { // default on : 1 off and no on we are off, otherwise on
+			if(foundOff && !foundOn) {
+				return foundOffConfig;
+			}
+			return foundOn ? foundOnConfig : allowedConfig;
+		} else { // default off : 
+			return foundOn && !foundOff ? foundOnConfig : foundOffConfig;
+		}
+	}
+
+	public PatternMethodConfig configFor(String methodName) {
+		boolean foundOn = false;
+		boolean foundOff = false;
+		PatternMethodConfig foundOnConfig = allowedConfig;
+		PatternMethodConfig foundOffConfig = notAllowedConfig;
+
+		for(PatternMethodConfig config : perClassConfigs) {
+			if(pathMatcher.match(config.className, methodName)) {
+				if(config.isAllowed()) {
+					if(showMethodRules) {
+						LOG.output("RULE: {} ON by rule {}, threshold:{}", methodName, config.className, (config.threshold == -1 ? "[DEFAULT]" : config.threshold));
+					}
+					foundOn = true;
+					foundOnConfig = config;
+				} else {
+					if(showMethodRules) {
+						LOG.output("RULE: {} OFF by rule {}", methodName, config.className);
+					}
+					foundOff = true;
+					foundOffConfig = config;
+				}
+			}
+		}
+		// default on : 1 off and 0 on is off, otherwise on
+		// default off : 1 on and 0 off is on, otherwise off
+		if(isDefaultOn()) { // default on : 1 off and no on we are off, otherwise on
+			if(foundOff && !foundOn) {
+				return foundOffConfig;
+			}
+			return foundOn ? foundOnConfig : allowedConfig;
+		} else { // default off : 
+			return foundOn && !foundOff ? foundOnConfig : foundOffConfig;
+		}
 	}
 }

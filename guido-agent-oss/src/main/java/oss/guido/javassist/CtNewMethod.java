@@ -17,12 +17,7 @@
 package oss.guido.javassist;
 
 import oss.guido.javassist.CtMethod.ConstParameter;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.ExceptionsAttribute;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.MethodInfo;
+import oss.guido.javassist.bytecode.*;
 import oss.guido.javassist.compiler.CompileError;
 import oss.guido.javassist.compiler.Javac;
 

@@ -20,6 +20,8 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.util.Map;
 
+import oss.guido.javassist.CtConstructor;
+
 /**
  * <code>EnclosingMethod_attribute</code>.
  */

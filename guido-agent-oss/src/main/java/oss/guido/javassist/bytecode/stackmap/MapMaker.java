@@ -19,15 +19,9 @@ package oss.guido.javassist.bytecode.stackmap;
 import java.util.ArrayList;
 
 import oss.guido.javassist.ClassPool;
+import oss.guido.javassist.CtClass;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.ByteArray;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.StackMap;
-import oss.guido.javassist.bytecode.StackMapTable;
+import oss.guido.javassist.bytecode.*;
 
 /**
  * Stack map maker.

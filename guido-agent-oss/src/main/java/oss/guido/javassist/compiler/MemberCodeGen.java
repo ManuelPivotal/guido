@@ -18,33 +18,9 @@ package oss.guido.javassist.compiler;
 
 import java.util.ArrayList;
 
-import oss.guido.javassist.ClassPool;
-import oss.guido.javassist.CtClass;
-import oss.guido.javassist.CtField;
-import oss.guido.javassist.CtMethod;
-import oss.guido.javassist.Modifier;
-import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.ClassFile;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
-import oss.guido.javassist.bytecode.FieldInfo;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.bytecode.Opcode;
-import oss.guido.javassist.compiler.ast.ASTList;
-import oss.guido.javassist.compiler.ast.ASTree;
-import oss.guido.javassist.compiler.ast.ArrayInit;
-import oss.guido.javassist.compiler.ast.CallExpr;
-import oss.guido.javassist.compiler.ast.Declarator;
-import oss.guido.javassist.compiler.ast.Expr;
-import oss.guido.javassist.compiler.ast.Keyword;
-import oss.guido.javassist.compiler.ast.Member;
-import oss.guido.javassist.compiler.ast.MethodDecl;
-import oss.guido.javassist.compiler.ast.NewExpr;
-import oss.guido.javassist.compiler.ast.Pair;
-import oss.guido.javassist.compiler.ast.Stmnt;
-import oss.guido.javassist.compiler.ast.Symbol;
+import oss.guido.javassist.*;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.compiler.ast.*;
 
 /* Code generator methods depending on javassist.* classes.
  */
@@ -666,7 +642,7 @@ public class MemberCodeGen extends CodeGen {
             bytecode.addInvokestatic(declClass, mname, desc);
         }
         else if (isSpecial)    // if (isSpecial && notStatic(acc))
-            bytecode.addInvokespecial(declClass, mname, desc);
+            bytecode.addInvokespecial(targetClass, mname, desc);
         else {
             if (!Modifier.isPublic(declClass.getModifiers())
                 || declClass.isInterface() != targetClass.isInterface())

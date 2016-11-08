@@ -16,10 +16,8 @@
 
 package oss.guido.javassist.tools.web;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.net.URL;
-import java.net.URLConnection;
+import java.io.*;
+import java.net.*;
 
 /**
  * A sample applet viewer.

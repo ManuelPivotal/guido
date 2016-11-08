@@ -19,17 +19,21 @@ package oss.guido.javassist.bytecode;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.ListIterator;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.ListIterator;
+import java.util.List;
+import java.util.Iterator;
 
 // Note: if you define a new subclass of AttributeInfo, then
 //       update AttributeInfo.read(), .copy(), and (maybe) write().
 
 /**
  * <code>attribute_info</code> structure.
+ *
+ * @see ClassFile#getAttribute(String)
+ * @see MethodInfo#getAttribute(String)
+ * @see FieldInfo#getAttribute(String)
  */
 public class AttributeInfo {
     protected ConstPool constPool;
@@ -227,16 +231,21 @@ public class AttributeInfo {
         return null;            // no such attribute
     }
 
-    static synchronized void remove(ArrayList list, String name) {
+    static synchronized AttributeInfo remove(ArrayList list, String name) {
         if (list == null)
-            return;
+            return null;
 
+        AttributeInfo removed = null;
         ListIterator iterator = list.listIterator();
         while (iterator.hasNext()) {
             AttributeInfo ai = (AttributeInfo)iterator.next();
-            if (ai.getName().equals(name))
+            if (ai.getName().equals(name)) {
                 iterator.remove();
+                removed = ai;
+            }
         }
+
+        return removed;
     }
 
     static void writeAll(ArrayList list, DataOutputStream out)

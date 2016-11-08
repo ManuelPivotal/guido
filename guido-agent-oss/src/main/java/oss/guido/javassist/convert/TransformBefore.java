@@ -19,12 +19,7 @@ package oss.guido.javassist.convert;
 import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.Bytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.Descriptor;
+import oss.guido.javassist.bytecode.*;
 
 public class TransformBefore extends TransformCall {
     protected CtClass[] parameterTypes;

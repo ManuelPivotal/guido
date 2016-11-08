@@ -16,11 +16,7 @@
 
 package oss.guido.javassist.bytecode.stackmap;
 
-import oss.guido.javassist.bytecode.AccessFlag;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.MethodInfo;
+import oss.guido.javassist.bytecode.*;
 
 public class TypedBlock extends BasicBlock {
     public int stackTop, numLocals;

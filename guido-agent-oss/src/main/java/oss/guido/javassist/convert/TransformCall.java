@@ -21,10 +21,7 @@ import oss.guido.javassist.CtClass;
 import oss.guido.javassist.CtMethod;
 import oss.guido.javassist.Modifier;
 import oss.guido.javassist.NotFoundException;
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
+import oss.guido.javassist.bytecode.*;
 
 public class TransformCall extends Transformer {
     protected String classname, methodname, methodDescriptor;

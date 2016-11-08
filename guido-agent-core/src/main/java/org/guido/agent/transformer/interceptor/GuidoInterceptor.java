@@ -16,7 +16,7 @@ import oss.guido.javassist.CtMethod;
 
 public class GuidoInterceptor {
 	
-	static public List<Object[]> references;
+	static public Map<Integer, Object[]> references;
 	static public Deque<Object[]> queue;
 	public static String pid;
 	public static long threshold = 500000; // (0.5 ms)
@@ -30,23 +30,6 @@ public class GuidoInterceptor {
 	public GuidoInterceptor() {
 	}
 
-	@SuppressWarnings({ "unchecked", "rawtypes" })
-	public GuidoInterceptor(Object mapRef) {
-		Map<String, Object> paramMap = (Map<String, Object>)mapRef;
-		GuidoInterceptor.references = (List<Object[]>)paramMap.get("refs");
-		GuidoInterceptor.queue = (Deque)paramMap.get("logQ");
-		GuidoInterceptor.pid = (String)paramMap.get("pid");
-		GuidoInterceptor.threshold = (long)paramMap.get("threshold");
-		GuidoInterceptor.extraProps = (Map<String, String>)paramMap.get("extraprops");
-	}
-	
-	static public Class<?>[] toLoad = new Class<?>[] {
-		InThreadStackElement.class,
-		SimpleOpInteger.class,
-		GuidoLogger.class,
-		ReferenceIndex.class
-	};
-	
 	static ThreadLocal<String> threadUuid = new ThreadLocal<String>();
 	static ThreadLocal<InThreadStackElement[]> localRefStack = new ThreadLocal<InThreadStackElement[]>();
 	static ThreadLocal<SimpleOpInteger> positionInStack = new ThreadLocal<SimpleOpInteger>();
@@ -81,15 +64,10 @@ public class GuidoInterceptor {
 		}
 	}
 	
-	static private boolean passes(InThreadStackElement stackElement) {
-		return stackElement.deltaTime > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
-	}
-	
 	static public void pop() {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
 			if(passes(stackElement)) {
-				//dumpClassLoaders();
 				Object[] objects = buildObjectCommon(stackElement);
 				totalsent++;
 				boolean offered = queue.offer(objects);
@@ -99,13 +77,7 @@ public class GuidoInterceptor {
 			}
 		}
 	}
-	static private void dumpClassLoaders() {
-		System.out.println(String.format("GuidoInterceptor classloader is %s ", 
-							GuidoInterceptor.class.getClassLoader()));
-		System.out.println(String.format("Thread class loader is %s", 
-							Thread.currentThread().getContextClassLoader()));
-	}
-	
+
 	static public void popInError(Throwable t) {
 		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
 			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
@@ -118,6 +90,10 @@ public class GuidoInterceptor {
 				}
 			}
 		}
+	}
+
+	static private boolean passes(InThreadStackElement stackElement) {
+		return stackElement.deltaTime > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
 	}
 	
 	static private Object[] buildObjectCommon(InThreadStackElement stackElement) {

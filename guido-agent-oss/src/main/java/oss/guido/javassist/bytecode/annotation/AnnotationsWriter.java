@@ -16,8 +16,7 @@
 
 package oss.guido.javassist.bytecode.annotation;
 
-import java.io.IOException;
-import java.io.OutputStream;
+import java.io.*;
 
 import oss.guido.javassist.bytecode.ByteArray;
 import oss.guido.javassist.bytecode.ConstPool;

@@ -16,21 +16,8 @@
 
 package oss.guido.javassist;
 
-import oss.guido.javassist.bytecode.BadBytecode;
-import oss.guido.javassist.bytecode.CodeAttribute;
-import oss.guido.javassist.bytecode.CodeIterator;
-import oss.guido.javassist.bytecode.ConstPool;
-import oss.guido.javassist.bytecode.MethodInfo;
-import oss.guido.javassist.convert.TransformAccessArrayField;
-import oss.guido.javassist.convert.TransformAfter;
-import oss.guido.javassist.convert.TransformBefore;
-import oss.guido.javassist.convert.TransformCall;
-import oss.guido.javassist.convert.TransformFieldAccess;
-import oss.guido.javassist.convert.TransformNew;
-import oss.guido.javassist.convert.TransformNewClass;
-import oss.guido.javassist.convert.TransformReadField;
-import oss.guido.javassist.convert.TransformWriteField;
-import oss.guido.javassist.convert.Transformer;
+import oss.guido.javassist.bytecode.*;
+import oss.guido.javassist.convert.*;
 
 /**
  * Simple translator of method bodies
