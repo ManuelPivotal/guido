@@ -40,7 +40,6 @@ import org.guido.agent.transformer.configuration.PatternMethodConfig;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer;
 import org.guido.agent.transformer.configuration.PatternMethodConfigurer.Reload;
 import org.guido.agent.transformer.interceptor.GuidoInterceptor;
-import org.guido.agent.transformer.interceptor.ReferenceIndex;
 import org.guido.agent.transformer.logger.GuidoLogger;
 import org.guido.util.PropsUtil;
 import org.guido.util.ThreadExecutorUtils;
@@ -350,8 +349,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 		GuidoInterceptor.extraProps = extraProps;
 	}
 	
-	int referenceNumber = 0;
-	
 	private int createReference(String methodName) {
 		int ref = methodName.hashCode();
 		synchronized(references) {
@@ -399,7 +396,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		}
 	}
 	
-	class MemStatsDumper implements Runnable {				
+	class ShowStatsDumper implements Runnable {				
 		@Override
 		public void run() {
 			guidoLOG.info("stats dump thread started");
@@ -408,23 +405,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 			for(;;) {
 				try {
 					Thread.sleep(30 * 1000);
-					Statistics stats = logRate.getStatistics();
-					guidoLOG.output("{[sent={}]}", df.format(stats.getCountLong()));
-					int total = 0;
-					int totalOn = 0;
-					int totalOff = 0;
-					for(Object[] ref : references.values()) {
-						if((boolean)ref[REF_ALLOWED]) {
-							totalOn++;
-						} else {
-							totalOff++;
-						}
-						total++;
-					}
-					guidoLOG.output("Total method is {}, {} on, {} off",
-							total, 
-							totalOn,
-							totalOff);
+					showSentAndMethodsStats(df);
+					showBytecodeStats(df);
 				} catch(InterruptedException ie) {
 					guidoLOG.info("InterruptedException in loop take()");
 					return;
@@ -434,6 +416,42 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 			}
 		}
+
+		private void showBytecodeStats(DecimalFormat df) {
+			double totalSeen = ((double)totalByteCodeSeen)/1000000.00;
+			double totalTransformedOrigin = ((double)totalByteCodeTransformedOrigin)/1000000.00;
+			double totalTransformedAfter = ((double)totalByteCodeTransformedNewSize)/1000000.00;
+			guidoLOG.output("Total bytecode seen by GuidoClassFileTransformer (MB) {}", df.format(totalSeen));
+			guidoLOG.output("Total bytecode before transformation by GuidoClassFileTransformer (MB) {}", df.format(totalTransformedOrigin));
+			guidoLOG.output("Total bytecode after transformation by GuidoClassFileTransformer (MB) {}", df.format(totalTransformedAfter));
+			guidoLOG.output(" >> Bytecode inflation (MB) {}", df.format(totalTransformedAfter - totalTransformedOrigin));
+			double percent = 0.0;
+			if(totalSeen != 0.0) {
+				percent = 100.0 * (totalTransformedAfter - totalTransformedOrigin)/totalSeen;
+				
+			}
+			guidoLOG.output(" >> % of bytecode added is {} %", df.format(percent));
+		}
+
+		private void showSentAndMethodsStats(DecimalFormat df) {
+			Statistics stats = logRate.getStatistics();
+			guidoLOG.output(" >> message(s) sent {}", df.format(stats.getCountLong()));
+			int total = 0;
+			int totalOn = 0;
+			int totalOff = 0;
+			for(Object[] ref : references.values()) {
+				if((boolean)ref[REF_ALLOWED]) {
+					totalOn++;
+				} else {
+					totalOff++;
+				}
+				total++;
+			}
+			guidoLOG.output("Total of instrumented method(s) is {}, {} on, {} off",
+					df.format(total), 
+					df.format(totalOn),
+					df.format(totalOff));
+		}
 	}
 	
 	private void startQListeners() {
@@ -441,9 +459,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 			qTransformerExecutor.submit(new LOGQListener());
 		}
 		if(statsFlag) {
-			qTransformerExecutor.submit(new MemStatsDumper());
+			qTransformerExecutor.submit(new ShowStatsDumper());
 		}
 	}
+	
+	private long totalByteCodeSeen = 0;
+	private long totalByteCodeTransformedOrigin = 0;
+	private long totalByteCodeTransformedNewSize = 0;
 	
 	@Override
 	public byte[] transform(ClassLoader loader, 
@@ -453,6 +475,10 @@ public class GuidoTransformer implements ClassFileTransformer {
 								byte[] classfileBuffer) throws IllegalClassFormatException {
 			// A null loader means the bootstrap loader.
 			// We do not instrument classes loaded by the bootstrap loader nor unnamed classes
+		if(classfileBuffer != null) {
+			totalByteCodeSeen += classfileBuffer.length;
+		}
+		
 		if(loader == null || className == null) {
 			return null;
 		}
@@ -498,7 +524,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 				}
 			}
 			guidoLOG.debug("instrumented {}",  cclass.getName());
-			return changed ? cclass.toBytecode() : null;
+			if(changed) {
+				totalByteCodeTransformedOrigin += classfileBuffer.length;
+				byte[] transformed = cclass.toBytecode();
+				totalByteCodeTransformedNewSize += transformed.length;
+				return transformed;
+			}
+			return null;
 		} catch(Exception e) {
 			guidoLOG.debug("exception 2 while transforming {}", cclass.getName());
 		} finally {

@@ -133,7 +133,7 @@ public class GithubConfigurationWatcher extends AbstractConfigurationWatcher {
 				}
 			}
 		} catch(Throwable e) {
-			LOG.error(e, "Error while getting bitbucket stash {}", 
+			LOG.info("Error while getting bitbucket stash {}", 
 						(urlAuth != null) ? urlAuth.displayableURL() : "");
 			notifyError();
 		}
