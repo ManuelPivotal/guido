@@ -5,12 +5,8 @@ import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_SHORT_S
 import static org.guido.agent.transformer.interceptor.ReferenceIndex.REF_THRESHOLD;
 
 import java.util.Deque;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.CountDownLatch;
-
-import org.guido.agent.transformer.logger.GuidoLogger;
 
 import oss.guido.javassist.CtMethod;
 
@@ -33,6 +29,10 @@ public class GuidoInterceptor {
 	static ThreadLocal<String> threadUuid = new ThreadLocal<String>();
 	static ThreadLocal<InThreadStackElement[]> localRefStack = new ThreadLocal<InThreadStackElement[]>();
 	static ThreadLocal<SimpleOpInteger> positionInStack = new ThreadLocal<SimpleOpInteger>();
+	
+	static public InThreadStackElement[] localRefStack() {
+		return localRefStack.get();
+	}
 	
 	static public String insertBefore(int index) {
 		return String
@@ -59,14 +59,15 @@ public class GuidoInterceptor {
 		if(stack == null) {
 			initTLSElements();
 		}
-		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
-			localRefStack.get()[positionInStack.get().addAndGet()].start(references.get(index));
+		if(positionInStack.get().value() < MAX_STACK_DEPTH) {
+			localRefStack.get()[positionInStack.get().addAndGet()].start(index, references.get(index));
 		}
 	}
 	
 	static public void pop() {
-		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
-			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
+		SimpleOpInteger posInStack = positionInStack.get();
+		if(posInStack.value() < MAX_STACK_DEPTH) {
+			InThreadStackElement stackElement = localRefStack.get()[posInStack.getAndDec()].stop();
 			if(passes(stackElement)) {
 				Object[] objects = buildObjectCommon(stackElement);
 				totalsent++;
@@ -74,22 +75,18 @@ public class GuidoInterceptor {
 				if(!offered) {
 					totalerror++;
 				}
+			}
+			int depth = posInStack.value();
+			if(depth >= 0) {
+				localRefStack.get()[depth].addCallee(stackElement.refIndex, 
+												stackElement.deltaTime,
+												(String)stackElement.reference[REF_SHORT_SIGNATURE]);
 			}
 		}
 	}
 
 	static public void popInError(Throwable t) {
-		if(positionInStack.get().get() < MAX_STACK_DEPTH) {
-			InThreadStackElement stackElement = localRefStack.get()[positionInStack.get().getAndDec()].stop();
-			if(passes(stackElement)) {
-				Object[] objects = buildObjectCommon(stackElement);
-				totalsent++;
-				boolean offered = queue.offer(objects);
-				if(!offered) {
-					totalerror++;
-				}
-			}
-		}
+		pop();
 	}
 
 	static private boolean passes(InThreadStackElement stackElement) {
@@ -97,14 +94,17 @@ public class GuidoInterceptor {
 	}
 	
 	static private Object[] buildObjectCommon(InThreadStackElement stackElement) {
-		Object[] objects = new Object[5];
+		Object[] logObjects = new Object[5 + stackElement.totalCallees];
 		int index = 0;
-		objects[index++] = pid;
-		objects[index++] = threadUuid.get();
-		objects[index++] = positionInStack.get().get() + 1;
-		objects[index++] = stackElement.reference[REF_SHORT_SIGNATURE];
-		objects[index++] = stackElement.deltaTime;
-		return objects;
+		logObjects[index++] = pid;
+		logObjects[index++] = threadUuid.get();
+		logObjects[index++] = positionInStack.get().value() + 1;
+		logObjects[index++] = stackElement.reference[REF_SHORT_SIGNATURE];
+		logObjects[index++] = stackElement.deltaTime;
+		for(int calleeIndex = 0; calleeIndex < stackElement.totalCallees; calleeIndex++) {
+			logObjects[index++] = stackElement.calleeElements[calleeIndex].duplicate();
+		}
+		return logObjects;
 	}
 	
 	private static void initTLSElements() {

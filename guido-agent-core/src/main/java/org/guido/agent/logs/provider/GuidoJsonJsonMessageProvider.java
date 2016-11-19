@@ -15,10 +15,12 @@ public class GuidoJsonJsonMessageProvider extends GuidoJsonMessageProvider {
 		super();
 		this.fieldNames = fieldNames;
 	}
+	
 	@Override
 	public String getFieldName() {
 		return "perfdata";
 	}
+	
     @Override
     public void writeTo(JsonGenerator generator, ILoggingEvent event) throws IOException {
     	Object[] args = event.getArgumentArray();

@@ -3,7 +3,7 @@ package org.guido.agent.transformer.interceptor;
 public class SimpleOpInteger {
 	public int value = -1;
 	
-	public int get() {
+	public int value() {
 		return value;
 	}
 

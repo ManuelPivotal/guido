@@ -71,7 +71,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 	Map<Integer, Object[]> references = new HashMap<Integer, Object[]>(32 * 1024);
 
 	Map<String, String> extraProps = new HashMap<String, String>();
-	private long threshold;
+	private static long threshold;
 	private PatternMethodConfigurer classConfigurer;
 	
 	String propEx = "guido.ext.";
@@ -85,7 +85,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 			"threadUuid", 
 			"depth", 
 			"methodCalled", 
-			"duration"
+			"duration",
+			"callees"
 	};
 	
 	ExponentialMovingAverageRate logRate = new ExponentialMovingAverageRate();
@@ -264,7 +265,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 
 	private void getMethodThreshold() {
 		String thresholdProp = getPropOrEnv("guido.threshold", "0.5");
-		this.threshold = PropsUtil.toNano(thresholdProp);
+		GuidoTransformer.threshold = PropsUtil.toNano(thresholdProp);
 	}
 
 	private void setInterceptorRefs() {
@@ -357,7 +358,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 		return ref;
 	}
 	
-	private Object[] newMethodReference(String methodName) {
+	static public Object[] newMethodReference(String methodName) {
 		Object[] ref = new Object[TOTAL_REF];
 
 		ref[REF_ALLOWED] = true;
@@ -401,7 +402,6 @@ public class GuidoTransformer implements ClassFileTransformer {
 		public void run() {
 			guidoLOG.info("stats dump thread started");
 			DecimalFormat df = new DecimalFormat("###,###.###"); 
-			//NumberFormat numberFormat = new NumberFormat("###,###");
 			for(;;) {
 				try {
 					Thread.sleep(30 * 1000);
@@ -411,8 +411,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 					guidoLOG.info("InterruptedException in loop take()");
 					return;
 				} catch(Exception e) {
-					guidoLOG.error(e, "exception in thred stat dump");
-					return;
+					// we can have a concurrent modification exception while we transform a method.
+					// so let's stay quiet :-)
 				}
 			}
 		}

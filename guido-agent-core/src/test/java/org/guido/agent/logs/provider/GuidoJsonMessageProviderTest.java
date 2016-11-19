@@ -5,9 +5,8 @@ import java.io.OutputStream;
 
 import junit.framework.Assert;
 
-import org.guido.agent.logs.provider.GuidoJsonMessageProvider;
 import org.guido.agent.logs.provider.GuidoJsonMessageProvider.MessageAddon;
-import org.guido.agent.logs.provider.GuidoLogstashEncoder;
+import org.guido.agent.transformer.interceptor.CalleeElement;
 import org.junit.Test;
 
 import oss.guido.ch.qos.logback.classic.Level;
@@ -93,7 +92,8 @@ public class GuidoJsonMessageProviderTest {
 		IntercepterConsoleAppender consoleAppender = new IntercepterConsoleAppender();
 		GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
 		String[] fieldNames = new String[] {
-				"helloKey"
+				"helloKey",
+				"calleeElement"
 		};
 		GuidoJsonJsonMessageProvider provider = new GuidoJsonJsonMessageProvider(fieldNames);
 		consoleEncoder.setMessageProvider(provider);
@@ -108,8 +108,13 @@ public class GuidoJsonMessageProviderTest {
 		LOG.setAdditive(false);
 		LOG.addAppender(consoleAppender);
 		loggerContext.start();
+		
+		CalleeElement element = CalleeElement.builder()
+				.withMinMaxTotalNbCallsDuration(10,  100,  1000, 3)
+				.withMethodCalled("method")
+				.build();
 
-		LOG.info("{}", new Object[]{"hello"});
+		LOG.info("{}", new Object[]{"hello", new Object[] {element, element}});
 		
 		String output = consoleAppender.getOutput();
 		System.out.println("output=" + output);
