@@ -81,12 +81,13 @@ public class GuidoTransformer implements ClassFileTransformer {
 	String pid;
 	
 	String[] jsonFieldNames = new String[] {
-			"pid", 
-			"threadUuid", 
-			"depth", 
-			"methodCalled", 
+			"caller", 
+			"thread_uuid", 
+			"depth",
+			"method_name", 
 			"duration",
-			"callees"
+			"uninstr_duration",
+			"called"
 	};
 	
 	ExponentialMovingAverageRate logRate = new ExponentialMovingAverageRate();
@@ -277,8 +278,8 @@ public class GuidoTransformer implements ClassFileTransformer {
 	private void createLogger() {
 		LoggerContext loggerContext = new LoggerContext();
 		
-		LOG = loggerContext.getLogger("json_tcp");
-		LOG.setLevel(Level.INFO);
+		LOG = loggerContext.getLogger("guido");
+		LOG.setLevel(Level.DEBUG);
 		
 		Appender globalAppender = null;
 		if(getPropOrEnvBoolean("guido.showLogsOnConsole")) {
@@ -304,15 +305,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 		}
 		String destination = getPropOrEnv("guido.destination", "api.logmatic.io:10514");
 		
-		GuidoLogstashEncoder encoder = new GuidoLogstashEncoder();
-		if(getPropOrEnvBoolean("guido.useJson")) {
-			encoder.setMessageProvider(new GuidoJsonJsonMessageProvider(jsonFieldNames));
-		} else {
-			encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
-		}
 		String appName = getPropOrEnv("guido.appname", "default-app-name");
+		GuidoLogstashEncoder encoder = createEncoder(String.format("{\"logmaticKey\":\"%s\", \"appname\" : \"%s\"}", logmaticKey, appName));
 		
-		encoder.setCustomFields(String.format("{\"logmaticKey\":\"%s\", \"appname\" : \"%s\"}", logmaticKey, appName));
 		encoder.start();
 		
 		LogstashTcpSocketAppender tcpSocketAppender = new LogstashTcpSocketAppender();
@@ -325,14 +320,26 @@ public class GuidoTransformer implements ClassFileTransformer {
 
 	}
 
+	private GuidoLogstashEncoder createEncoder(String customeFields) {
+		GuidoLogstashEncoder encoder = new GuidoLogstashEncoder();
+		if(getPropOrEnvBoolean("guido.useJson", true)) {
+			encoder.setMessageProvider(new GuidoJsonJsonMessageProvider(jsonFieldNames));
+		} else {
+			encoder.setMessageProvider(new GuidoJsonMessageProvider(addons));
+		}
+		encoder.setCustomFields(customeFields);
+
+		return encoder;
+	}
+
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private Appender createConsoleAppender(LoggerContext loggerContext) {
 		LoggingEventAsyncDisruptorAppender disruptorAppender = new LoggingEventAsyncDisruptorAppender();
 		disruptorAppender.setContext(loggerContext);
 		
 		ConsoleAppender consoleAppender = new ConsoleAppender();
-		GuidoLogstashEncoder consoleEncoder = new GuidoLogstashEncoder();
-		consoleEncoder.setMessageProvider(new GuidoJsonJsonMessageProvider(jsonFieldNames));
+		GuidoLogstashEncoder consoleEncoder = createEncoder(String.format("{\"appname\" : \"%s\"}", getPropOrEnv("guido.appname", "default-app-name")));
+		
 		consoleEncoder.start();
 		consoleAppender.setEncoder(consoleEncoder);
 		consoleAppender.setContext(loggerContext);
@@ -378,7 +385,9 @@ public class GuidoTransformer implements ClassFileTransformer {
 				try {
 					Object[] logContents = queue.take();
 					logContents[4] = toMicroSec(logContents[4]);
-					LOG.info("pid={} threadUuid={} depth={} methodCalled={} duration={}", logContents);
+					logContents[5] = toMicroSec(logContents[5]);
+					LOG.debug("caller={} threadUuid={} depth={} methodCalled={} duration={} unnacountedDuration={}", 
+							logContents);
 					if(statsFlag) {
 						logRate.increment();
 					}

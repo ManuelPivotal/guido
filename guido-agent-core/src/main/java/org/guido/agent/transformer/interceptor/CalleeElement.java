@@ -1,6 +1,7 @@
 package org.guido.agent.transformer.interceptor;
 
 import static org.guido.util.ToStringHelper.toStringHelper;
+import oss.guido.com.fasterxml.jackson.annotation.JsonProperty;
 
 public class CalleeElement {
 	long refIndex;
@@ -35,21 +36,30 @@ public class CalleeElement {
 		return new CalleeElementBuilder();
 	}
 	
+	@JsonProperty("count")
+	public long getTotalCalls() {
+		return totalCalls;
+	}
+	
+	@JsonProperty("max_duration")
 	public double getMax() {
 		return ((double)maxDuration)/1000.00;
 	}
 
+	@JsonProperty("min_duration")
 	public double getMin() {
 		return ((double)minDuration)/1000.00;
 	}
 
+	@JsonProperty("avg_duration")
 	public double getAvg() {
 		if(totalCalls == 0) {
 			return 0.0; // should never happen as we create a callee only after a call has been achieved.
 		}
 		return ((double)(totalDuration)/1000.00)/(totalCalls);
 	}
-
+	
+	@JsonProperty("name")
 	public String getMethodCalled() {
 		return methodCalled;
 	}

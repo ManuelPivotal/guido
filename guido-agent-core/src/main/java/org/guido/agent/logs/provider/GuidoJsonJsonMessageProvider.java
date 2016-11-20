@@ -18,13 +18,15 @@ public class GuidoJsonJsonMessageProvider extends GuidoJsonMessageProvider {
 	
 	@Override
 	public String getFieldName() {
-		return "perfdata";
+		return "metric";
 	}
 	
     @Override
     public void writeTo(JsonGenerator generator, ILoggingEvent event) throws IOException {
     	Object[] args = event.getArgumentArray();
     	Map<String, Object> jsonMap = new HashMap<String, Object>();
+//    	jsonMap.put("logger_name", "guido");
+//    	jsonMap.put("thread_name", event.getThreadName());
     	for(int index = 0; index < fieldNames.length; index++) {
     		if(fieldNames[index] != null) {
 	    		if(index == args.length) {

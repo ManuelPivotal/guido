@@ -17,9 +17,10 @@ public class InThreadStackElement {
 	public Object[] reference;
 	public long startNanoTime;
 	public long stopNanoTime;
-	public long deltaTime;
+	public long duration;
 	public int refIndex;
 	public int totalCallees = 0;
+	public long calleesDuration;
 	public CalleeElement[] calleeElements;
 	
 	public InThreadStackElement() {
@@ -34,8 +35,13 @@ public class InThreadStackElement {
 		this.reference = reference;
 		this.startNanoTime = System.nanoTime();
 		this.stopNanoTime = -1;
-		this.deltaTime = -1;
+		this.duration = -1;
 		this.totalCallees = 0;
+		this.calleesDuration = 0;
+	}
+	
+	public long unaccountedDuration() {
+		return (duration - calleesDuration);
 	}
 
 	public void addCallee(long refIndex, long duration, String methodCalled) {
@@ -51,6 +57,7 @@ public class InThreadStackElement {
 				if(duration < element.minDuration) {
 					element.minDuration = duration;
 				}
+				calleesDuration += duration;
 				return;
 			}
 		}
@@ -63,11 +70,12 @@ public class InThreadStackElement {
 		element.refIndex = refIndex;
 		element.maxDuration = element.minDuration = element.totalDuration = duration;
 		element.methodCalled = methodCalled;
+		calleesDuration += duration;
 	}
 
 	public InThreadStackElement stop() {
 		stopNanoTime = System.nanoTime();
-		deltaTime = stopNanoTime - startNanoTime;
+		duration = stopNanoTime - startNanoTime;
 		return this;
 	}
 	
@@ -79,5 +87,18 @@ public class InThreadStackElement {
 			helper.add("calleeElements[" + index + "]", calleeElements[index]);
 		}
 		return helper.toString();
+	}
+	
+	Object[] noCallees = new Object[0];
+	
+	public Object duplicateCalleeElements() {
+		if(totalCallees == 0) {
+			return noCallees;
+		}
+		Object[] elements = new Object[totalCallees];
+		for(int index = 0; index < totalCallees; index++) {
+			elements[index] = calleeElements[index].duplicate();
+		}
+		return elements;
 	}
 }

@@ -59,7 +59,8 @@ public class GuidoInterceptor {
 		if(stack == null) {
 			initTLSElements();
 		}
-		if(positionInStack.get().value() < MAX_STACK_DEPTH) {
+		int currentDepth = positionInStack.get().value();
+		if(currentDepth < MAX_STACK_DEPTH) {
 			localRefStack.get()[positionInStack.get().addAndGet()].start(index, references.get(index));
 		}
 	}
@@ -79,7 +80,7 @@ public class GuidoInterceptor {
 			int depth = posInStack.value();
 			if(depth >= 0) {
 				localRefStack.get()[depth].addCallee(stackElement.refIndex, 
-												stackElement.deltaTime,
+												stackElement.duration,
 												(String)stackElement.reference[REF_SHORT_SIGNATURE]);
 			}
 		}
@@ -90,20 +91,23 @@ public class GuidoInterceptor {
 	}
 
 	static private boolean passes(InThreadStackElement stackElement) {
-		return stackElement.deltaTime > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
+		return stackElement.duration > (long)stackElement.reference[REF_THRESHOLD] && (Boolean)stackElement.reference[REF_ALLOWED];
 	}
 	
 	static private Object[] buildObjectCommon(InThreadStackElement stackElement) {
-		Object[] logObjects = new Object[5 + stackElement.totalCallees];
-		int index = 0;
-		logObjects[index++] = pid;
-		logObjects[index++] = threadUuid.get();
-		logObjects[index++] = positionInStack.get().value() + 1;
-		logObjects[index++] = stackElement.reference[REF_SHORT_SIGNATURE];
-		logObjects[index++] = stackElement.deltaTime;
-		for(int calleeIndex = 0; calleeIndex < stackElement.totalCallees; calleeIndex++) {
-			logObjects[index++] = stackElement.calleeElements[calleeIndex].duplicate();
+		Object[] logObjects = new Object[6 + 1];
+		int depth = positionInStack.get().value() + 1;
+		logObjects[0] = "n/a";
+		if(depth > 0) {
+			logObjects[0] = localRefStack.get()[depth - 1].reference[REF_SHORT_SIGNATURE];
 		}
+		int index = 1;
+		logObjects[index++] = threadUuid.get();
+		logObjects[index++] = depth;
+		logObjects[index++] = stackElement.reference[REF_SHORT_SIGNATURE];
+		logObjects[index++] = stackElement.duration;
+		logObjects[index++] = stackElement.unaccountedDuration();
+		logObjects[index++] = stackElement.duplicateCalleeElements();
 		return logObjects;
 	}
 	
