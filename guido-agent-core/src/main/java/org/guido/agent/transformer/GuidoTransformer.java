@@ -81,12 +81,12 @@ public class GuidoTransformer implements ClassFileTransformer {
 	String pid;
 	
 	String[] jsonFieldNames = new String[] {
-			"caller", 
-			"thread_uuid", 
-			"depth",
 			"method_name", 
 			"duration",
-			"uninstr_duration",
+			"depth",
+			"caller", 
+			"thread_uuid", 
+			"excluded_calls_duration",
 			"called"
 	};
 	
@@ -384,7 +384,7 @@ public class GuidoTransformer implements ClassFileTransformer {
 			for(;;) {
 				try {
 					Object[] logContents = queue.take();
-					logContents[4] = toMicroSec(logContents[4]);
+					logContents[1] = toMicroSec(logContents[1]);
 					logContents[5] = toMicroSec(logContents[5]);
 					LOG.debug("caller={} threadUuid={} depth={} methodCalled={} duration={} unnacountedDuration={}", 
 							logContents);

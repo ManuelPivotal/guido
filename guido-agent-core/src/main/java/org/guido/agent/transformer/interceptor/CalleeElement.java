@@ -3,12 +3,12 @@ package org.guido.agent.transformer.interceptor;
 import static org.guido.util.ToStringHelper.toStringHelper;
 import oss.guido.com.fasterxml.jackson.annotation.JsonProperty;
 
-public class CalleeElement {
+public class CalleeElement implements Comparable<CalleeElement> {
 	long refIndex;
 	long totalCalls;
 	long maxDuration;
 	long minDuration;
-	long totalDuration;
+	long totalDuration = 0;
 	String methodCalled;
 	
 	static public class CalleeElementBuilder {
@@ -51,17 +51,28 @@ public class CalleeElement {
 		return ((double)minDuration)/1000.00;
 	}
 
+	@JsonProperty("total_duration")
+	public double getTotal() {
+		return ((double)totalDuration)/1000.00;
+	}
+
 	@JsonProperty("avg_duration")
 	public double getAvg() {
 		if(totalCalls == 0) {
 			return 0.0; // should never happen as we create a callee only after a call has been achieved.
 		}
-		return ((double)(totalDuration)/1000.00)/(totalCalls);
+		double result = ((double)(totalDuration))/(totalCalls);
+		return result / 1000.00;
 	}
 	
 	@JsonProperty("name")
 	public String getMethodCalled() {
 		return methodCalled;
+	}
+	
+	@Override
+	public int compareTo(CalleeElement other) {
+		return (int)(other.totalDuration - totalDuration);
 	}
 
 	public CalleeElement duplicate() {
@@ -75,14 +86,24 @@ public class CalleeElement {
 		return element;
 	}
 
+	public void reset() {
+		this.refIndex = 0;
+		this.totalCalls = 0;
+		this.maxDuration = 0;
+		this.minDuration = 0;
+		this.totalDuration = 0;
+		this.methodCalled = null;
+	}
+
 	public String toString() {
 		return toStringHelper(this)
 				.add("refIndex", refIndex)
-				.add("totalCalls", totalCalls)
-				.add("maxDuration", maxDuration)
-				.add("minDuration", minDuration)
 				.add("totalDuration", totalDuration)
+				.add("totalCalls", getTotalCalls())
+				.add("maxDuration", getMax())
+				.add("minDuration", getMin())
 				.add("methodCalled", methodCalled)
+				.add("avg", getAvg())
 			.toString();
 	}
 

@@ -1,7 +1,7 @@
 package org.guido.agent.logs.provider;
 
 import java.io.IOException;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import oss.guido.ch.qos.logback.classic.spi.ILoggingEvent;
@@ -24,9 +24,7 @@ public class GuidoJsonJsonMessageProvider extends GuidoJsonMessageProvider {
     @Override
     public void writeTo(JsonGenerator generator, ILoggingEvent event) throws IOException {
     	Object[] args = event.getArgumentArray();
-    	Map<String, Object> jsonMap = new HashMap<String, Object>();
-//    	jsonMap.put("logger_name", "guido");
-//    	jsonMap.put("thread_name", event.getThreadName());
+    	Map<String, Object> jsonMap = new LinkedHashMap<String, Object>();
     	for(int index = 0; index < fieldNames.length; index++) {
     		if(fieldNames[index] != null) {
 	    		if(index == args.length) {

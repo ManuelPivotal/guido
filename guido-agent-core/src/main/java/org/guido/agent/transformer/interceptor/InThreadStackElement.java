@@ -2,11 +2,21 @@ package org.guido.agent.transformer.interceptor;
 
 import static org.guido.util.ToStringHelper.toStringHelper;
 
+import java.util.Arrays;
+
 import org.guido.util.ToStringHelper;
 
 public class InThreadStackElement {
 	
-	static public int maxCallee = 20;
+	static public int maxCallee = 64;
+	static public int topMethods = 16;
+	
+	public static int getTopMethods() {
+		return topMethods;
+	}
+	public static void setTopMethods(int topMethods) {
+		InThreadStackElement.topMethods = topMethods;
+	}
 	static public void setMaxCallee(int max) {
 		maxCallee = max;
 	}
@@ -38,6 +48,9 @@ public class InThreadStackElement {
 		this.duration = -1;
 		this.totalCallees = 0;
 		this.calleesDuration = 0;
+		for(int i = 0; i < calleeElements.length; i++) {
+			calleeElements[i].reset();
+		}
 	}
 	
 	public long unaccountedDuration() {
@@ -57,7 +70,8 @@ public class InThreadStackElement {
 				if(duration < element.minDuration) {
 					element.minDuration = duration;
 				}
-				calleesDuration += duration;
+				//calleesDuration += duration;
+				//System.out.println("Found callee " + element);
 				return;
 			}
 		}
@@ -70,7 +84,8 @@ public class InThreadStackElement {
 		element.refIndex = refIndex;
 		element.maxDuration = element.minDuration = element.totalDuration = duration;
 		element.methodCalled = methodCalled;
-		calleesDuration += duration;
+		//calleesDuration += duration;
+		//System.out.println("Create callee " + element);
 	}
 
 	public InThreadStackElement stop() {
@@ -91,14 +106,22 @@ public class InThreadStackElement {
 	
 	Object[] noCallees = new Object[0];
 	
-	public Object duplicateCalleeElements() {
+	public Object topCalleeElements() {
 		if(totalCallees == 0) {
 			return noCallees;
 		}
-		Object[] elements = new Object[totalCallees];
+		CalleeElement[] elements = new CalleeElement[totalCallees];
 		for(int index = 0; index < totalCallees; index++) {
 			elements[index] = calleeElements[index].duplicate();
 		}
-		return elements;
+		Arrays.sort(elements);
+		int max = Math.min(totalCallees, topMethods);
+		CalleeElement[] sortedElements = new CalleeElement[max];
+		calleesDuration = 0;
+		for(int index = 0; index < max; index++) {
+			sortedElements[index] = elements[index];
+			calleesDuration += sortedElements[index].totalDuration;
+		}
+		return sortedElements;
 	}
 }
